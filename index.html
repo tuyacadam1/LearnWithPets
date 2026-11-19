@@ -8,6 +8,7 @@
 </head>
 <body>
 
+  <!-- Loading Overlay -->
   <div id="loader" class="loader-overlay hidden">
     <div class="spinner"></div>
   </div>
@@ -34,6 +35,7 @@
 
   <!-- DASHBOARD VIEW -->
   <div id="dashboard-view" class="app-layout hidden">
+    <!-- Sidebar -->
     <aside class="sidebar">
       <div class="brand">
         <h3>🎓 EduGacha</h3>
@@ -48,7 +50,9 @@
       <button id="logout-btn" class="btn btn-outline logout-btn">Logout</button>
     </aside>
 
+    <!-- Main Content -->
     <main class="main-content">
+      
       <!-- TAB 1: MANAGE CLASSES -->
       <section id="tab-classes" class="tab-panel active">
         <header class="panel-header">
@@ -110,24 +114,34 @@
       <section id="tab-gacha" class="tab-panel hidden">
         <header class="panel-header">
           <h2>Manage Gacha Pool</h2>
-          <div class="rate-badge">Total Drop Rate: <span id="total-drop-rate">0</span>%</div>
+          <div class="rate-badge">Items in Pool: <span id="gacha-count">0</span></div>
         </header>
 
-        <form id="add-gacha-form" class="card-box grid-form">
-          <input type="text" id="gacha-name" placeholder="Reward Name (e.g. +5 Quiz Bonus)" required>
-          <select id="gacha-rarity">
-            <option value="Common">Common</option>
-            <option value="Rare">Rare</option>
-            <option value="Epic">Epic</option>
-            <option value="Legendary">Legendary</option>
-          </select>
-          <input type="number" id="gacha-rate" placeholder="Drop Rate (%)" min="1" max="100" required>
-          <input type="url" id="gacha-img" placeholder="Image URL (optional)">
-          <button type="submit" class="btn btn-primary">+ Add Reward</button>
+        <form id="add-gacha-form" class="card-box gacha-upload-form">
+          <div class="upload-group">
+            <label for="gacha-file" class="file-label">📁 Choose Reward Image</label>
+            <input type="file" id="gacha-file" accept="image/*" required>
+            <img id="gacha-preview" class="preview-thumb hidden" alt="Preview">
+          </div>
+
+          <div class="rarity-group">
+            <select id="gacha-rarity">
+              <option value="Common">Common (45% Chance)</option>
+              <option value="Uncommon">Uncommon (28% Chance)</option>
+              <option value="Rare">Rare (15% Chance)</option>
+              <option value="Epic">Epic (8% Chance)</option>
+              <option value="Mythic">Mythic (3% Chance)</option>
+              <option value="Legend">Legend (1% Chance)</option>
+            </select>
+            <span id="auto-chance-display" class="chance-pill">Auto Chance: 45%</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary">+ Add to Pool</button>
         </form>
 
         <div id="gacha-grid" class="cards-grid"></div>
       </section>
+
     </main>
   </div>
 
