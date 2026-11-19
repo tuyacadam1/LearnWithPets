@@ -1,6 +1,6 @@
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzReMeuhTNzHlzNBA6BvldLcGLNTLsOBf6-zunyHc6cdk1u5Mt3hBkfur8XY9ZPK22n/exec';
 
-let state = { teacher: null, classes: [], students: [], gachaPool: [] };
+let state = { teacher: null, classes: [], students: [], gachaPool: [], logs: [] };
 let uploadedImageData = null;
 
 const toggleLoader = (show) => document.getElementById('loader').classList.toggle('hidden', !show);
@@ -39,7 +39,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => {
-  state = { teacher: null, classes: [], students: [], gachaPool: [] };
+  state = { teacher: null, classes: [], students: [], gachaPool: [], logs: [] };
   document.getElementById('dashboard-view').classList.add('hidden');
   document.getElementById('login-view').classList.remove('hidden');
 });
@@ -50,6 +50,7 @@ async function loadDashboardData() {
     state.classes = res.classes;
     state.students = res.students;
     state.gachaPool = res.gachaPool;
+    state.logs = res.logs || [];
     document.getElementById('login-view').classList.add('hidden');
     document.getElementById('dashboard-view').classList.remove('hidden');
     renderAll();
@@ -73,6 +74,7 @@ function renderAll() {
   renderStudents();
   renderPoints();
   renderGacha();
+  renderHistory();
 }
 
 function populateDropdowns() {
@@ -151,7 +153,7 @@ function renderStudents() {
     <div class="item-card">
       <div>
         <h4>👾 ${s.name}</h4>
-        <p class="item-meta">${s.points} PTS</p>
+        <p class="item-meta">ID: ${s.id} • ${s.points} PTS</p>
       </div>
       <button class="game-btn btn-red btn-sm" onclick="removeStudent('${s.id}')">KICK</button>
     </div>
@@ -168,8 +170,15 @@ window.removeStudent = async (studentId) => {
   toggleLoader(false);
 };
 
-// --- 3. POINTS ---
+// --- 3. POINTS (INSTANT OPTIMISTIC + BATCHED SYNC) ---
 document.getElementById('points-class-filter').addEventListener('change', renderPoints);
+
+const pendingPointDeltas = {};
+const pointSyncTimers = {};
+
+window.setReason = (text) => {
+  document.getElementById('point-reason-input').value = text;
+};
 
 function renderPoints() {
   const classId = document.getElementById('points-class-filter').value;
@@ -178,53 +187,87 @@ function renderPoints() {
     <div class="item-card">
       <div>
         <h4>${s.name}</h4>
-        <div class="points-score">${s.points} ⭐</div>
+        <div class="points-score" id="score-${s.id}">${s.points} ⭐</div>
       </div>
       <div class="pt-btn-row">
-        <button class="game-btn btn-green btn-sm" onclick="changePoints('${s.id}', 1)">+1</button>
         <button class="game-btn btn-green btn-sm" onclick="changePoints('${s.id}', 5)">+5</button>
-        <button class="game-btn btn-red btn-sm" onclick="changePoints('${s.id}', -1)">-1</button>
+        <button class="game-btn btn-green btn-sm" onclick="changePoints('${s.id}', 10)">+10</button>
+        <button class="game-btn btn-gold btn-sm" onclick="changePoints('${s.id}', 50)">+50</button>
+        <button class="game-btn btn-red btn-sm" onclick="changePoints('${s.id}', -5)">-5</button>
       </div>
     </div>
   `).join('');
 }
 
-window.changePoints = async (studentId, delta) => {
-  toggleLoader(true);
-  const res = await callGAS('updatePoints', { studentId, delta });
-  if (res.success) {
-    const s = state.students.find(st => st.id === studentId);
-    if (s) s.points = res.newPoints;
-    renderStudents();
-    renderPoints();
-  }
-  toggleLoader(false);
+window.changePoints = (studentId, delta) => {
+  const s = state.students.find(st => st.id === studentId);
+  if (!s) return;
+
+  const reason = document.getElementById('point-reason-input').value.trim() || 'Bonus';
+  const cls = state.classes.find(c => c.id === s.classId);
+
+  s.points = Math.max(0, s.points + delta);
+  const scoreEl = document.getElementById(`score-${studentId}`);
+  if (scoreEl) scoreEl.textContent = `${s.points} ⭐`;
+  renderStudents();
+
+  pendingPointDeltas[studentId] = (pendingPointDeltas[studentId] || 0) + delta;
+  clearTimeout(pointSyncTimers[studentId]);
+
+  pointSyncTimers[studentId] = setTimeout(() => {
+    const totalDelta = pendingPointDeltas[studentId];
+    delete pendingPointDeltas[studentId];
+
+    if (totalDelta !== 0) {
+      state.logs.unshift({
+        time: 'Just now',
+        className: cls ? cls.name : '',
+        studentName: s.name,
+        details: `[${reason}] ${totalDelta > 0 ? '+' : ''}${totalDelta} pts (Total: ${s.points})`
+      });
+      renderHistory();
+      callGAS('updatePoints', { studentId, delta: totalDelta, reason });
+    }
+  }, 600);
+};
+
+window.bulkPoints = (delta, customReason) => {
+  const classId = document.getElementById('points-class-filter').value;
+  if (!classId) return;
+
+  const reason = customReason || document.getElementById('point-reason-input').value.trim() || 'Class Bonus';
+  const cls = state.classes.find(c => c.id === classId);
+
+  state.students.forEach(s => {
+    if (s.classId === classId) {
+      s.points = Math.max(0, s.points + delta);
+    }
+  });
+
+  state.logs.unshift({
+    time: 'Just now',
+    className: cls ? cls.name : '',
+    studentName: '🏆 WHOLE GUILD',
+    details: `[${reason}] ${delta > 0 ? '+' : ''}${delta} pts to class`
+  });
+
+  renderPoints();
+  renderStudents();
+  renderHistory();
+  callGAS('bulkUpdatePoints', { classId, delta, reason });
 };
 
 // --- 4. GACHA POOL (AUTO-TRANSPARENT + MISCRITS IDLE) ---
-
-// Flood-fill removes outer white background without erasing light fur/eyes inside the outline
 function removeOuterWhiteBackground(ctx, width, height) {
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
   const visited = new Uint8Array(width * height);
   const stack = [];
 
-  // Helper to check if a pixel is white or near-white JPEG compression artifact
-  const isBackground = (idx) => {
-    const r = data[idx];
-    const g = data[idx + 1];
-    const b = data[idx + 2];
-    return r > 235 && g > 235 && b > 235;
-  };
+  const isBackground = (idx) => data[idx] > 235 && data[idx + 1] > 235 && data[idx + 2] > 235;
 
-  // Seed flood-fill from all 4 outer edges
-  for (let x = 0; x < width; x++) {
-    stack.push([x, 0], [x, height - 1]);
-  }
-  for (let y = 0; y < height; y++) {
-    stack.push([0, y], [width - 1, y]);
-  }
+  for (let x = 0; x < width; x++) stack.push([x, 0], [x, height - 1]);
+  for (let y = 0; y < height; y++) stack.push([0, y], [width - 1, y]);
 
   while (stack.length > 0) {
     const [x, y] = stack.pop();
@@ -236,12 +279,11 @@ function removeOuterWhiteBackground(ctx, width, height) {
 
     const pixelIdx = pos * 4;
     if (isBackground(pixelIdx)) {
-      data[pixelIdx + 3] = 0; // Make pixel transparent
+      data[pixelIdx + 3] = 0;
       stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
     }
   }
 
-  // Smooth anti-aliased fringe pixels directly touching transparent pixels
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const pos = y * width + x;
@@ -289,10 +331,7 @@ document.getElementById('gacha-file').addEventListener('change', (e) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      // Erase outer white background to create transparent sprite
       removeOuterWhiteBackground(ctx, width, height);
-
-      // Save as transparent PNG
       uploadedImageData = canvas.toDataURL('image/png');
 
       const preview = document.getElementById('gacha-preview');
@@ -350,3 +389,33 @@ window.removeGacha = async (itemId) => {
   }
   toggleLoader(false);
 };
+
+// --- 5. POINT MONITOR / HISTORY ---
+document.getElementById('history-class-filter').addEventListener('change', renderHistory);
+
+function renderHistory() {
+  const filterSelect = document.getElementById('history-class-filter');
+  const selectedClassName = filterSelect.options[filterSelect.selectedIndex]?.text || '';
+  const filtered = selectedClassName && selectedClassName !== 'No Classes Yet'
+    ? state.logs.filter(l => l.className === selectedClassName)
+    : state.logs;
+
+  const container = document.getElementById('history-list');
+  if (!filtered.length) {
+    container.innerHTML = '<div class="game-box" style="text-align:center;">No points awarded for this guild yet!</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(log => {
+    const isNeg = log.details.includes('-');
+    return `
+      <div class="history-row">
+        <div class="history-left">
+          <span class="history-student">${log.studentName}</span>
+          <span class="history-meta">🏰 ${log.className} • 🕒 ${log.time}</span>
+        </div>
+        <span class="history-badge ${isNeg ? 'negative' : ''}">${log.details}</span>
+      </div>
+    `;
+  }).join('');
+}
