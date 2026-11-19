@@ -168,8 +168,36 @@ input:focus, select:focus { outline: none; border-color: #fbbf24; }
 .Mythic { background: #f43f5e; box-shadow: 0 5px 0 #be123c; }
 .Legend { background: linear-gradient(135deg, #fbbf24, #d97706); color: #1e1b4b; box-shadow: 0 5px 0 #92400e; }
 
-.gacha-img { width: 100px; height: 100px; object-fit: contain; margin: 0 auto; border-radius: 10px; }
-.badge {
-  display: inline-block; padding: 4px 12px; border-radius: 20px;
-  font-size: 12px; font-weight: 900; text-transform: uppercase;
+/* Miscrits-Style Creature Sprite & Idle Animation */
+.gacha-img,
+.preview-box {
+  width: 110px;
+  height: 110px;
+  object-fit: contain;
+  margin: 0 auto;
+  transform-origin: bottom center;
+  animation: miscritIdle 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.45));
+}
+
+.preview-box {
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  background: transparent;
+  border: 2px dashed #fbbf24;
+  border-radius: 12px;
+  padding: 4px;
+}
+
+@keyframes miscritIdle {
+  0%, 100% {
+    transform: translateY(0) scaleX(1) scaleY(1);
+  }
+  25% {
+    transform: translateY(2px) scaleX(1.04) scaleY(0.95);
+  }
+  60% {
+    transform: translateY(-4px) scaleX(0.97) scaleY(1.04);
+  }
 }
