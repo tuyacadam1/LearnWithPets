@@ -1,6 +1,6 @@
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzReMeuhTNzHlzNBA6BvldLcGLNTLsOBf6-zunyHc6cdk1u5Mt3hBkfur8XY9ZPK22n/exec';
 
-let state = { teacher: null, classes: [], students: [], gachaPool: [], logs: [] };
+let state = { teacher: null, classes: [], students: [], gachaPool: [], taskRecords: [] };
 let uploadedImageData = null;
 
 const toggleLoader = (show) => document.getElementById('loader').classList.toggle('hidden', !show);
@@ -39,7 +39,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => {
-  state = { teacher: null, classes: [], students: [], gachaPool: [], logs: [] };
+  state = { teacher: null, classes: [], students: [], gachaPool: [], taskRecords: [] };
   document.getElementById('dashboard-view').classList.add('hidden');
   document.getElementById('login-view').classList.remove('hidden');
 });
@@ -50,7 +50,7 @@ async function loadDashboardData() {
     state.classes = res.classes;
     state.students = res.students;
     state.gachaPool = res.gachaPool;
-    state.logs = res.logs || [];
+    state.taskRecords = res.taskRecords || [];
     document.getElementById('login-view').classList.add('hidden');
     document.getElementById('dashboard-view').classList.remove('hidden');
     renderAll();
@@ -74,7 +74,7 @@ function renderAll() {
   renderStudents();
   renderPoints();
   renderGacha();
-  renderHistory();
+  renderEClassRecord();
 }
 
 function populateDropdowns() {
@@ -170,91 +170,105 @@ window.removeStudent = async (studentId) => {
   toggleLoader(false);
 };
 
-// --- 3. POINTS (INSTANT OPTIMISTIC + BATCHED SYNC) ---
+// --- 3. CUSTOM TASK & POINTS ---
 document.getElementById('points-class-filter').addEventListener('change', renderPoints);
-
-const pendingPointDeltas = {};
-const pointSyncTimers = {};
-
-window.setReason = (text) => {
-  document.getElementById('point-reason-input').value = text;
-};
+document.getElementById('task-name-input').addEventListener('input', renderPoints);
+document.getElementById('task-points-input').addEventListener('input', () => {
+  const pts = Number(document.getElementById('task-points-input').value) || 0;
+  document.getElementById('bulk-award-btn').textContent = `🔥 AWARD ALL (+${pts})`;
+  renderPoints();
+});
 
 function renderPoints() {
   const classId = document.getElementById('points-class-filter').value;
+  const taskName = document.getElementById('task-name-input').value.trim() || 'Task';
+  const customPts = Number(document.getElementById('task-points-input').value) || 0;
   const list = state.students.filter(s => s.classId === classId);
-  document.getElementById('points-grid').innerHTML = list.map(s => `
-    <div class="item-card">
-      <div>
-        <h4>${s.name}</h4>
-        <div class="points-score" id="score-${s.id}">${s.points} ⭐</div>
+
+  document.getElementById('points-grid').innerHTML = list.map(s => {
+    const rec = state.taskRecords.find(
+      r => r.classId === classId && r.studentId === s.id && r.taskName.toLowerCase() === taskName.toLowerCase()
+    );
+
+    let statusHtml = `<span class="task-status-badge status-pending">Not Graded Yet</span>`;
+    if (rec) {
+      statusHtml = rec.points > 0
+        ? `<span class="task-status-badge status-done">✅ ${taskName}: ${rec.points} pts</span>`
+        : `<span class="task-status-badge status-miss">❌ ${taskName}: 0 (Missed)</span>`;
+    }
+
+    return `
+      <div class="item-card">
+        <div>
+          <h4>${s.name}</h4>
+          <div class="points-score">${s.points} ⭐</div>
+          ${statusHtml}
+        </div>
+        <div class="pt-btn-row">
+          <button class="game-btn btn-green btn-sm" onclick="scoreStudentTask('${s.id}', ${customPts})">+${customPts} PTS</button>
+          <button class="game-btn btn-red btn-sm" onclick="scoreStudentTask('${s.id}', 0)">0 (MISS)</button>
+        </div>
       </div>
-      <div class="pt-btn-row">
-        <button class="game-btn btn-green btn-sm" onclick="changePoints('${s.id}', 5)">+5</button>
-        <button class="game-btn btn-green btn-sm" onclick="changePoints('${s.id}', 10)">+10</button>
-        <button class="game-btn btn-gold btn-sm" onclick="changePoints('${s.id}', 50)">+50</button>
-        <button class="game-btn btn-red btn-sm" onclick="changePoints('${s.id}', -5)">-5</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
-window.changePoints = (studentId, delta) => {
-  const s = state.students.find(st => st.id === studentId);
-  if (!s) return;
+window.scoreStudentTask = (studentId, awardedPoints) => {
+  const classId = document.getElementById('points-class-filter').value;
+  const taskName = document.getElementById('task-name-input').value.trim() || 'Task';
+  const student = state.students.find(s => s.id === studentId);
+  if (!student || !classId) return;
 
-  const reason = document.getElementById('point-reason-input').value.trim() || 'Bonus';
-  const cls = state.classes.find(c => c.id === s.classId);
+  // Find existing record for this task to adjust student's spendable balance accurately
+  const existing = state.taskRecords.find(
+    r => r.classId === classId && r.studentId === studentId && r.taskName.toLowerCase() === taskName.toLowerCase()
+  );
+  const oldPts = existing ? existing.points : 0;
+  const delta = awardedPoints - oldPts;
 
-  s.points = Math.max(0, s.points + delta);
-  const scoreEl = document.getElementById(`score-${studentId}`);
-  if (scoreEl) scoreEl.textContent = `${s.points} ⭐`;
+  student.points = Math.max(0, student.points + delta);
+
+  if (existing) {
+    existing.points = awardedPoints;
+  } else {
+    state.taskRecords.push({ classId, studentId, taskName, points: awardedPoints });
+  }
+
+  renderPoints();
   renderStudents();
+  renderEClassRecord();
 
-  pendingPointDeltas[studentId] = (pendingPointDeltas[studentId] || 0) + delta;
-  clearTimeout(pointSyncTimers[studentId]);
-
-  pointSyncTimers[studentId] = setTimeout(() => {
-    const totalDelta = pendingPointDeltas[studentId];
-    delete pendingPointDeltas[studentId];
-
-    if (totalDelta !== 0) {
-      state.logs.unshift({
-        time: 'Just now',
-        className: cls ? cls.name : '',
-        studentName: s.name,
-        details: `[${reason}] ${totalDelta > 0 ? '+' : ''}${totalDelta} pts (Total: ${s.points})`
-      });
-      renderHistory();
-      callGAS('updatePoints', { studentId, delta: totalDelta, reason });
-    }
-  }, 600);
+  // Save silently in background
+  callGAS('recordTask', { classId, studentId, taskName, points: awardedPoints });
 };
 
-window.bulkPoints = (delta, customReason) => {
+window.awardAllStudents = () => {
   const classId = document.getElementById('points-class-filter').value;
+  const taskName = document.getElementById('task-name-input').value.trim() || 'Task';
+  const customPts = Number(document.getElementById('task-points-input').value) || 0;
   if (!classId) return;
-
-  const reason = customReason || document.getElementById('point-reason-input').value.trim() || 'Class Bonus';
-  const cls = state.classes.find(c => c.id === classId);
 
   state.students.forEach(s => {
     if (s.classId === classId) {
-      s.points = Math.max(0, s.points + delta);
-    }
-  });
+      const existing = state.taskRecords.find(
+        r => r.classId === classId && r.studentId === s.id && r.taskName.toLowerCase() === taskName.toLowerCase()
+      );
+      const oldPts = existing ? existing.points : 0;
+      s.points = Math.max(0, s.points + (customPts - oldPts));
 
-  state.logs.unshift({
-    time: 'Just now',
-    className: cls ? cls.name : '',
-    studentName: '🏆 WHOLE GUILD',
-    details: `[${reason}] ${delta > 0 ? '+' : ''}${delta} pts to class`
+      if (existing) {
+        existing.points = customPts;
+      } else {
+        state.taskRecords.push({ classId, studentId: s.id, taskName, points: customPts });
+      }
+    }
   });
 
   renderPoints();
   renderStudents();
-  renderHistory();
-  callGAS('bulkUpdatePoints', { classId, delta, reason });
+  renderEClassRecord();
+
+  callGAS('bulkRecordTask', { classId, taskName, points: customPts });
 };
 
 // --- 4. GACHA POOL (AUTO-TRANSPARENT + MISCRITS IDLE) ---
@@ -390,32 +404,65 @@ window.removeGacha = async (itemId) => {
   toggleLoader(false);
 };
 
-// --- 5. POINT MONITOR / HISTORY ---
-document.getElementById('history-class-filter').addEventListener('change', renderHistory);
+// --- 5. E-CLASS RECORD (TASK MATRIX) ---
+document.getElementById('history-class-filter').addEventListener('change', renderEClassRecord);
 
-function renderHistory() {
-  const filterSelect = document.getElementById('history-class-filter');
-  const selectedClassName = filterSelect.options[filterSelect.selectedIndex]?.text || '';
-  const filtered = selectedClassName && selectedClassName !== 'No Classes Yet'
-    ? state.logs.filter(l => l.className === selectedClassName)
-    : state.logs;
+function renderEClassRecord() {
+  const classId = document.getElementById('history-class-filter').value;
+  const classStudents = state.students.filter(s => s.classId === classId);
+  const classRecords = state.taskRecords.filter(r => r.classId === classId);
 
-  const container = document.getElementById('history-list');
-  if (!filtered.length) {
-    container.innerHTML = '<div class="game-box" style="text-align:center;">No points awarded for this guild yet!</div>';
+  const thead = document.getElementById('record-thead');
+  const tbody = document.getElementById('record-tbody');
+
+  if (!classStudents.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr><td style="text-align:center;padding:24px;">No students in this class yet.</td></tr>';
     return;
   }
 
-  container.innerHTML = filtered.map(log => {
-    const isNeg = log.details.includes('-');
+  // Extract unique task names in chronological order
+  const taskColumns = [];
+  classRecords.forEach(r => {
+    if (!taskColumns.some(t => t.toLowerCase() === r.taskName.toLowerCase())) {
+      taskColumns.push(r.taskName);
+    }
+  });
+
+  // Render Header Row
+  thead.innerHTML = `
+    <tr>
+      <th>Student Name</th>
+      ${taskColumns.map(task => `<th>${task}</th>`).join('')}
+      <th>Total Task Score</th>
+      <th>Gacha Wallet ⭐</th>
+    </tr>
+  `;
+
+  // Render Student Rows
+  tbody.innerHTML = classStudents.map(student => {
+    let totalTaskScore = 0;
+
+    const taskCells = taskColumns.map(task => {
+      const rec = classRecords.find(
+        r => r.studentId === student.id && r.taskName.toLowerCase() === task.toLowerCase()
+      );
+
+      if (!rec || rec.points === 0) {
+        return `<td class="cell-missing">❌ MISSING (0)</td>`;
+      }
+
+      totalTaskScore += rec.points;
+      return `<td class="cell-score">✅ ${rec.points}</td>`;
+    }).join('');
+
     return `
-      <div class="history-row">
-        <div class="history-left">
-          <span class="history-student">${log.studentName}</span>
-          <span class="history-meta">🏰 ${log.className} • 🕒 ${log.time}</span>
-        </div>
-        <span class="history-badge ${isNeg ? 'negative' : ''}">${log.details}</span>
-      </div>
+      <tr>
+        <td>👾 ${student.name}</td>
+        ${taskCells}
+        <td class="cell-total">${totalTaskScore} pts</td>
+        <td>${student.points} ⭐</td>
+      </tr>
     `;
   }).join('');
 }
