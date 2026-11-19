@@ -112,7 +112,7 @@
       <div id="points-grid" class="cards-grid"></div>
     </section>
 
-    <!-- SCREEN 4: GACHA POOL -->
+    <!-- SCREEN 4: GACHA POOL (NAME + ELEMENT + AUTO-TRANSPARENT) -->
     <section id="tab-gacha" class="tab-panel hidden">
       <div class="game-box gacha-creator">
         <h3>1. Upload Creature Image (Auto-Transparent)</h3>
@@ -125,7 +125,18 @@
           <span id="file-status" class="item-meta">No file chosen</span>
         </div>
 
-        <h3 style="margin-top:18px;">2. Click Rarity to Add!</h3>
+        <h3 style="margin-top:18px;">2. Name & Element</h3>
+        <div class="inline-group" style="max-width: 540px;">
+          <input type="text" id="gacha-name-input" placeholder="Creature Name (e.g. Acornhog)..." style="flex: 2; min-width: 180px;">
+          <select id="gacha-element-select" style="flex: 1; min-width: 140px;">
+            <option value="Fire">🔥 Fire</option>
+            <option value="Nature" selected>🌿 Nature</option>
+            <option value="Water">💧 Water</option>
+            <option value="Lightning">⚡ Lightning</option>
+          </select>
+        </div>
+
+        <h3 style="margin-top:18px;">3. Click Rarity to Add!</h3>
         <div class="rarity-btn-grid">
           <button type="button" class="game-btn rarity-btn Common" onclick="uploadAndAddGacha('Common')">COMMON<br><small>45%</small></button>
           <button type="button" class="game-btn rarity-btn Uncommon" onclick="uploadAndAddGacha('Uncommon')">UNCOMMON<br><small>28%</small></button>
