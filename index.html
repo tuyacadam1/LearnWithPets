@@ -1,1 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teacher Portal</title>
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
 
+  <!-- Loading Overlay -->
+  <div id="loader" class="loader-overlay hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- LOGIN VIEW -->
+  <div id="login-view" class="auth-container">
+    <div class="auth-card">
+      <h2>🍎 Teacher Portal</h2>
+      <p>Sign in to manage classes, points & gacha</p>
+      <form id="login-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="login-username" required placeholder="e.g. admin">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" required placeholder="••••">
+        </div>
+        <p id="login-error" class="error-msg"></p>
+        <button type="submit" class="btn btn-primary full-width">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="dashboard-view" class="app-layout hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <h3>🎓 EduGacha</h3>
+        <span id="teacher-display-name">Teacher</span>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="classes">📚 Manage Classes</button>
+        <button class="nav-btn" data-tab="students">🧑‍🎓 Manage Students</button>
+        <button class="nav-btn" data-tab="points">⭐ Manage Points</button>
+        <button class="nav-btn" data-tab="gacha">🎰 Manage Gacha Pool</button>
+      </nav>
+      <button id="logout-btn" class="btn btn-outline logout-btn">Logout</button>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- TAB 1: MANAGE CLASSES -->
+      <section id="tab-classes" class="tab-panel active">
+        <header class="panel-header">
+          <h2>Manage Classes</h2>
+          <form id="add-class-form" class="inline-form">
+            <input type="text" id="new-class-name" placeholder="New Class Name (e.g. Grade 10 - A)" required>
+            <button type="submit" class="btn btn-primary">+ Add Class</button>
+          </form>
+        </header>
+        <div id="classes-grid" class="cards-grid"></div>
+      </section>
+
+      <!-- TAB 2: MANAGE STUDENTS -->
+      <section id="tab-students" class="tab-panel hidden">
+        <header class="panel-header">
+          <h2>Manage Students</h2>
+          <div class="filter-bar">
+            <label>Filter by Class:</label>
+            <select id="student-class-filter" class="class-selector"></select>
+          </div>
+        </header>
+
+        <form id="add-student-form" class="card-box inline-form">
+          <select id="add-student-class" class="class-selector" required></select>
+          <input type="text" id="new-student-name" placeholder="Student Full Name" required>
+          <input type="number" id="new-student-points" placeholder="Initial Points" value="0" min="0">
+          <button type="submit" class="btn btn-primary">+ Add Student</button>
+        </form>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Student Name</th>
+                <th>Class</th>
+                <th>Current Points</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="students-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3: MANAGE POINTS -->
+      <section id="tab-points" class="tab-panel hidden">
+        <header class="panel-header">
+          <h2>Manage Points</h2>
+          <div class="filter-bar">
+            <label>Select Class:</label>
+            <select id="points-class-filter" class="class-selector"></select>
+          </div>
+        </header>
+        <div id="points-grid" class="cards-grid"></div>
+      </section>
+
+      <!-- TAB 4: MANAGE GACHA POOL -->
+      <section id="tab-gacha" class="tab-panel hidden">
+        <header class="panel-header">
+          <h2>Manage Gacha Pool</h2>
+          <div class="rate-badge">Total Drop Rate: <span id="total-drop-rate">0</span>%</div>
+        </header>
+
+        <form id="add-gacha-form" class="card-box grid-form">
+          <input type="text" id="gacha-name" placeholder="Reward Name (e.g. +5 Quiz Bonus)" required>
+          <select id="gacha-rarity">
+            <option value="Common">Common</option>
+            <option value="Rare">Rare</option>
+            <option value="Epic">Epic</option>
+            <option value="Legendary">Legendary</option>
+          </select>
+          <input type="number" id="gacha-rate" placeholder="Drop Rate (%)" min="1" max="100" required>
+          <input type="url" id="gacha-img" placeholder="Image URL (optional)">
+          <button type="submit" class="btn btn-primary">+ Add Reward</button>
+        </form>
+
+        <div id="gacha-grid" class="cards-grid"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <?!= include('JavaScript'); ?>
+</body>
+</html>
