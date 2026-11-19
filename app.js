@@ -201,7 +201,68 @@ window.changePoints = async (studentId, delta) => {
   toggleLoader(false);
 };
 
-// --- 4. GACHA POOL (IMAGE UPLOAD + RARITY BUTTONS) ---
+// --- 4. GACHA POOL (AUTO-TRANSPARENT + MISCRITS IDLE) ---
+
+// Flood-fill removes outer white background without erasing light fur/eyes inside the outline
+function removeOuterWhiteBackground(ctx, width, height) {
+  const imgData = ctx.getImageData(0, 0, width, height);
+  const data = imgData.data;
+  const visited = new Uint8Array(width * height);
+  const stack = [];
+
+  // Helper to check if a pixel is white or near-white JPEG compression artifact
+  const isBackground = (idx) => {
+    const r = data[idx];
+    const g = data[idx + 1];
+    const b = data[idx + 2];
+    return r > 235 && g > 235 && b > 235;
+  };
+
+  // Seed flood-fill from all 4 outer edges
+  for (let x = 0; x < width; x++) {
+    stack.push([x, 0], [x, height - 1]);
+  }
+  for (let y = 0; y < height; y++) {
+    stack.push([0, y], [width - 1, y]);
+  }
+
+  while (stack.length > 0) {
+    const [x, y] = stack.pop();
+    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+
+    const pos = y * width + x;
+    if (visited[pos]) continue;
+    visited[pos] = 1;
+
+    const pixelIdx = pos * 4;
+    if (isBackground(pixelIdx)) {
+      data[pixelIdx + 3] = 0; // Make pixel transparent
+      stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+  }
+
+  // Smooth anti-aliased fringe pixels directly touching transparent pixels
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const pos = y * width + x;
+      const idx = pos * 4;
+      if (data[idx + 3] === 0) continue;
+
+      const hasTransparentNeighbor =
+        data[((y - 1) * width + x) * 4 + 3] === 0 ||
+        data[((y + 1) * width + x) * 4 + 3] === 0 ||
+        data[(y * width + (x - 1)) * 4 + 3] === 0 ||
+        data[(y * width + (x + 1)) * 4 + 3] === 0;
+
+      if (hasTransparentNeighbor && data[idx] > 200 && data[idx + 1] > 200 && data[idx + 2] > 200) {
+        data[idx + 3] = 90;
+      }
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
 document.getElementById('gacha-file').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -210,17 +271,16 @@ document.getElementById('gacha-file').addEventListener('change', (e) => {
   reader.onload = (event) => {
     const img = new Image();
     img.onload = () => {
-      // Resize to max 200x200 so it saves cleanly in Google Sheets without Drive permissions
       const canvas = document.createElement('canvas');
       const maxSize = 200;
       let width = img.width;
       let height = img.height;
 
       if (width > height && width > maxSize) {
-        height *= maxSize / width;
+        height = Math.round((height * maxSize) / width);
         width = maxSize;
       } else if (height > maxSize) {
-        width *= maxSize / height;
+        width = Math.round((width * maxSize) / height);
         height = maxSize;
       }
 
@@ -229,12 +289,16 @@ document.getElementById('gacha-file').addEventListener('change', (e) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      uploadedImageData = canvas.toDataURL('image/webp', 0.85);
+      // Erase outer white background to create transparent sprite
+      removeOuterWhiteBackground(ctx, width, height);
+
+      // Save as transparent PNG
+      uploadedImageData = canvas.toDataURL('image/png');
 
       const preview = document.getElementById('gacha-preview');
       preview.src = uploadedImageData;
       preview.classList.remove('hidden');
-      document.getElementById('file-status').textContent = file.name;
+      document.getElementById('file-status').textContent = file.name + ' (Transparent Ready!)';
     };
     img.src = event.target.result;
   };
@@ -255,7 +319,6 @@ window.uploadAndAddGacha = async (rarity) => {
 
   if (res.success) {
     state.gachaPool.push(res.data);
-    // Reset upload state
     uploadedImageData = null;
     document.getElementById('gacha-file').value = '';
     document.getElementById('gacha-preview').classList.add('hidden');
@@ -266,9 +329,9 @@ window.uploadAndAddGacha = async (rarity) => {
 };
 
 function renderGacha() {
-  document.getElementById('gacha-grid').innerHTML = state.gachaPool.map(item => `
+  document.getElementById('gacha-grid').innerHTML = state.gachaPool.map((item, idx) => `
     <div class="item-card">
-      <img src="${item.imageUrl}" class="gacha-img" alt="Loot">
+      <img src="${item.imageUrl}" class="gacha-img" style="animation-delay: -${(idx * 0.4) % 2}s;" alt="Creature">
       <div>
         <span class="badge ${item.rarity}">${item.rarity}</span>
         <p class="item-meta" style="margin-top:6px;">${item.dropRate}% CHANCE</p>
