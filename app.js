@@ -1,5 +1,14 @@
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzReMeuhTNzHlzNBA6BvldLcGLNTLsOBf6-zunyHc6cdk1u5Mt3hBkfur8XY9ZPK22n/exec';
 
+const RARITY_CHANCES = {
+  Common: 45,
+  Uncommon: 28,
+  Rare: 15,
+  Epic: 8,
+  Mythic: 3,
+  Legend: 1
+};
+
 let state = {
   teacher: null,
   classes: [],
@@ -17,7 +26,7 @@ async function callGAS(action, payload = {}) {
     const response = await fetch(GAS_WEB_APP_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'text/plain;charset=utf-8' // Avoids CORS preflight issues with GAS
+        'Content-Type': 'text/plain;charset=utf-8'
       },
       body: JSON.stringify({ action, payload })
     });
@@ -150,11 +159,11 @@ document.getElementById('add-student-form').addEventListener('submit', async (e)
   e.preventDefault();
   const classId = document.getElementById('add-student-class').value;
   const name = document.getElementById('new-student-name').value.trim();
-  const points = document.getElementById('new-student-points').value;
+  const pts = document.getElementById('new-student-points').value;
   if (!classId) return alert('Create a class first.');
 
   toggleLoader(true);
-  const res = await callGAS('addStudent', { classId, name, points });
+  const res = await callGAS('addStudent', { classId, name, points: pts });
   if (res.success) {
     state.students.push(res.data);
     document.getElementById('new-student-name').value = '';
@@ -231,50 +240,87 @@ window.changePoints = async (studentId, delta) => {
 };
 
 // --- 4. MANAGE GACHA POOL ---
+document.getElementById('gacha-rarity').addEventListener('change', (e) => {
+  const chance = RARITY_CHANCES[e.target.value] || 45;
+  document.getElementById('auto-chance-display').textContent = `Auto Chance: ${chance}%`;
+});
+
+document.getElementById('gacha-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  const preview = document.getElementById('gacha-preview');
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove('hidden');
+  } else {
+    preview.classList.add('hidden');
+  }
+});
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64String = reader.result.split(',')[1];
+      resolve(base64String);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 document.getElementById('add-gacha-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const item = {
-    name: document.getElementById('gacha-name').value.trim(),
-    rarity: document.getElementById('gacha-rarity').value,
-    dropRate: document.getElementById('gacha-rate').value,
-    imageUrl: document.getElementById('gacha-img').value.trim()
-  };
+  const fileInput = document.getElementById('gacha-file');
+  const file = fileInput.files[0];
+  if (!file) return alert('Please select an image first.');
+
+  const rarity = document.getElementById('gacha-rarity').value;
 
   toggleLoader(true);
-  const res = await callGAS('addGacha', { teacherId: state.teacher.id, item });
-  if (res.success) {
-    state.gachaPool.push(res.data);
-    document.getElementById('add-gacha-form').reset();
-    renderGacha();
+  try {
+    const imageBase64 = await readFileAsBase64(file);
+    const res = await callGAS('addGacha', {
+      teacherId: state.teacher.id,
+      rarity,
+      imageBase64,
+      mimeType: file.type,
+      fileName: file.name
+    });
+
+    if (res.success) {
+      state.gachaPool.push(res.data);
+      document.getElementById('add-gacha-form').reset();
+      document.getElementById('gacha-preview').classList.add('hidden');
+      document.getElementById('auto-chance-display').textContent = 'Auto Chance: 45%';
+      renderGacha();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Failed to upload image.');
   }
   toggleLoader(false);
 });
 
 function renderGacha() {
   const grid = document.getElementById('gacha-grid');
-  let totalRate = 0;
+  document.getElementById('gacha-count').textContent = state.gachaPool.length;
 
-  grid.innerHTML = state.gachaPool.map(item => {
-    totalRate += Number(item.dropRate);
-    return `
-      <div class="item-card">
+  grid.innerHTML = state.gachaPool.map(item => `
+    <div class="item-card">
+      <img src="${item.imageUrl}" alt="${item.rarity} reward" class="gacha-card-img">
+      <div class="gacha-card-footer">
         <div>
           <span class="badge ${item.rarity}">${item.rarity}</span>
-          <h4 style="margin-top:8px;">${item.name}</h4>
-          <p class="item-meta">Drop Rate: <strong>${item.dropRate}%</strong></p>
+          <p class="item-meta" style="margin-top:6px;">Chance: <strong>${item.dropRate}%</strong></p>
         </div>
-        <button class="btn btn-danger" onclick="removeGacha('${item.id}')">Delete Reward</button>
+        <button class="btn btn-danger" onclick="removeGacha('${item.id}')">Delete</button>
       </div>
-    `;
-  }).join('');
-
-  const rateSpan = document.getElementById('total-drop-rate');
-  rateSpan.textContent = totalRate;
-  rateSpan.style.color = totalRate === 100 ? 'var(--success)' : 'var(--danger)';
+    </div>
+  `).join('');
 }
 
 window.removeGacha = async (itemId) => {
-  if (!confirm('Delete this reward?')) return;
+  if (!confirm('Delete this reward from the pool?')) return;
   toggleLoader(true);
   const res = await callGAS('deleteGacha', { itemId });
   if (res.success) {
