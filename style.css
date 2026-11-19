@@ -26,6 +26,7 @@ body {
 
 /* 3D Arcade Buttons */
 .game-btn {
+  display: inline-block;
   border: none;
   border-radius: 14px;
   padding: 12px 18px;
@@ -136,15 +137,23 @@ input:focus, select:focus { outline: none; border-color: #fbbf24; }
 .points-score { font-size: 30px; font-weight: 900; color: #fbbf24; }
 .pt-btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 
-/* Gacha Icon Picker & Rarity Buttons */
+/* Gacha Upload Button & Rarity Buttons */
 .gacha-creator h3 { font-size: 15px; color: #fbbf24; margin-bottom: 10px; }
-.icon-picker { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.icon-option {
-  width: 56px; height: 56px; border-radius: 12px; background: #1e1b4b;
-  border: 2px solid #4338ca; cursor: pointer; padding: 6px; object-fit: contain;
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
-.icon-option.selected, .icon-option:hover { border-color: #fbbf24; transform: scale(1.08); }
-#gacha-img-url { width: 100%; }
+.preview-box {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: #1e1b4b;
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
+  padding: 4px;
+}
 
 .rarity-btn-grid {
   display: grid;
@@ -159,7 +168,7 @@ input:focus, select:focus { outline: none; border-color: #fbbf24; }
 .Mythic { background: #f43f5e; box-shadow: 0 5px 0 #be123c; }
 .Legend { background: linear-gradient(135deg, #fbbf24, #d97706); color: #1e1b4b; box-shadow: 0 5px 0 #92400e; }
 
-.gacha-img { width: 90px; height: 90px; object-fit: contain; margin: 0 auto; }
+.gacha-img { width: 100px; height: 100px; object-fit: contain; margin: 0 auto; border-radius: 10px; }
 .badge {
   display: inline-block; padding: 4px 12px; border-radius: 20px;
   font-size: 12px; font-weight: 900; text-transform: uppercase;
