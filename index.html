@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Teacher Portal</title>
-  <?!= include('Stylesheet'); ?>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Loading Overlay -->
   <div id="loader" class="loader-overlay hidden">
     <div class="spinner"></div>
   </div>
@@ -35,7 +34,6 @@
 
   <!-- DASHBOARD VIEW -->
   <div id="dashboard-view" class="app-layout hidden">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <div class="brand">
         <h3>🎓 EduGacha</h3>
@@ -50,9 +48,7 @@
       <button id="logout-btn" class="btn btn-outline logout-btn">Logout</button>
     </aside>
 
-    <!-- Main Content -->
     <main class="main-content">
-      
       <!-- TAB 1: MANAGE CLASSES -->
       <section id="tab-classes" class="tab-panel active">
         <header class="panel-header">
@@ -132,10 +128,9 @@
 
         <div id="gacha-grid" class="cards-grid"></div>
       </section>
-
     </main>
   </div>
 
-  <?!= include('JavaScript'); ?>
+  <script src="app.js"></script>
 </body>
 </html>
