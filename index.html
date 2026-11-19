@@ -90,21 +90,27 @@
       <div id="points-grid" class="cards-grid"></div>
     </section>
 
-    <!-- SCREEN 4: GACHA POOL (1-CLICK ICON + RARITY BUTTONS) -->
+    <!-- SCREEN 4: GACHA POOL (UPLOAD BUTTON + 6 RARITY BUTTONS) -->
     <section id="tab-gacha" class="tab-panel hidden">
       <div class="game-box gacha-creator">
-        <h3>1. Pick an Icon (or paste image link)</h3>
-        <div id="preset-icons" class="icon-picker"></div>
-        <input type="url" id="gacha-img-url" placeholder="Or paste any Image URL here..." required>
+        <h3>1. Upload Reward Image</h3>
+        <div class="upload-row">
+          <label for="gacha-file" class="game-btn btn-blue upload-btn">
+            📁 UPLOAD IMAGE
+          </label>
+          <input type="file" id="gacha-file" accept="image/*" class="hidden">
+          <img id="gacha-preview" class="preview-box hidden" alt="Preview">
+          <span id="file-status" class="item-meta">No file chosen</span>
+        </div>
 
-        <h3 style="margin-top:16px;">2. Click a Rarity Button to Add!</h3>
+        <h3 style="margin-top:18px;">2. Click Rarity to Add!</h3>
         <div class="rarity-btn-grid">
-          <button type="button" class="game-btn rarity-btn Common" onclick="quickAddGacha('Common')">COMMON<br><small>45%</small></button>
-          <button type="button" class="game-btn rarity-btn Uncommon" onclick="quickAddGacha('Uncommon')">UNCOMMON<br><small>28%</small></button>
-          <button type="button" class="game-btn rarity-btn Rare" onclick="quickAddGacha('Rare')">RARE<br><small>15%</small></button>
-          <button type="button" class="game-btn rarity-btn Epic" onclick="quickAddGacha('Epic')">EPIC<br><small>8%</small></button>
-          <button type="button" class="game-btn rarity-btn Mythic" onclick="quickAddGacha('Mythic')">MYTHIC<br><small>3%</small></button>
-          <button type="button" class="game-btn rarity-btn Legend" onclick="quickAddGacha('Legend')">LEGEND<br><small>1%</small></button>
+          <button type="button" class="game-btn rarity-btn Common" onclick="uploadAndAddGacha('Common')">COMMON<br><small>45%</small></button>
+          <button type="button" class="game-btn rarity-btn Uncommon" onclick="uploadAndAddGacha('Uncommon')">UNCOMMON<br><small>28%</small></button>
+          <button type="button" class="game-btn rarity-btn Rare" onclick="uploadAndAddGacha('Rare')">RARE<br><small>15%</small></button>
+          <button type="button" class="game-btn rarity-btn Epic" onclick="uploadAndAddGacha('Epic')">EPIC<br><small>8%</small></button>
+          <button type="button" class="game-btn rarity-btn Mythic" onclick="uploadAndAddGacha('Mythic')">MYTHIC<br><small>3%</small></button>
+          <button type="button" class="game-btn rarity-btn Legend" onclick="uploadAndAddGacha('Legend')">LEGEND<br><small>1%</small></button>
         </div>
       </div>
 
