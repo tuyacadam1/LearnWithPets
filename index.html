@@ -58,8 +58,8 @@
         <span class="label">GACHA POOL</span>
       </button>
       <button class="menu-btn btn-teal" data-tab="history">
-        <span class="icon">📜</span>
-        <span class="label">HISTORY</span>
+        <span class="icon">📊</span>
+        <span class="label">E-CLASS RECORD</span>
       </button>
     </nav>
 
@@ -85,33 +85,34 @@
       <div id="students-grid" class="cards-grid"></div>
     </section>
 
-    <!-- SCREEN 3: POINTS (INSTANT + REASON TAGS + ATTENDANCE +50) -->
+    <!-- SCREEN 3: CUSTOM TASK & POINTS -->
     <section id="tab-points" class="tab-panel hidden">
-      <div class="game-box" style="padding: 16px;">
-        <div class="game-bar" style="margin-bottom: 12px; padding: 0; background: transparent;">
-          <div class="inline-group" style="align-items: center;">
-            <span class="bar-label">GUILD:</span>
+      <div class="game-box">
+        <div class="task-setup-grid">
+          <div class="field-group">
+            <label class="bar-label">GUILD / CLASS:</label>
             <select id="points-class-filter" class="class-selector"></select>
           </div>
-          <div class="inline-group" style="align-items: center;">
-            <span class="bar-label">REASON:</span>
-            <input type="text" id="point-reason-input" value="Attendance" placeholder="Reason (e.g. Quiz, Recitation)" style="flex:1; min-width: 160px;">
+          <div class="field-group">
+            <label class="bar-label">TASK NAME:</label>
+            <input type="text" id="task-name-input" value="Attendance" placeholder="e.g. Attendance, Quiz 1, Lab 2">
           </div>
-        </div>
-
-        <div class="reason-pills">
-          <button type="button" class="game-btn btn-green btn-sm" onclick="setReason('Attendance')">📅 Attendance</button>
-          <button type="button" class="game-btn btn-blue btn-sm" onclick="setReason('Recitation')">🎤 Recitation</button>
-          <button type="button" class="game-btn btn-purple btn-sm" onclick="setReason('Quiz')">📝 Quiz</button>
-          <button type="button" class="game-btn btn-red btn-sm" onclick="setReason('Penalty')">⚠️ Penalty</button>
-          <button type="button" class="game-btn btn-gold btn-sm" onclick="bulkPoints(50, 'Attendance')">🔥 +50 ATTENDANCE (ALL)</button>
+          <div class="field-group">
+            <label class="bar-label">CUSTOM POINTS:</label>
+            <input type="number" id="task-points-input" value="50" min="0" step="5">
+          </div>
+          <div class="field-group" style="justify-content: flex-end;">
+            <button type="button" id="bulk-award-btn" class="game-btn btn-gold" onclick="awardAllStudents()">
+              🔥 AWARD ALL (+50)
+            </button>
+          </div>
         </div>
       </div>
 
       <div id="points-grid" class="cards-grid"></div>
     </section>
 
-    <!-- SCREEN 4: GACHA POOL (TRANSPARENT UPLOAD + MISCRITS IDLE) -->
+    <!-- SCREEN 4: GACHA POOL -->
     <section id="tab-gacha" class="tab-panel hidden">
       <div class="game-box gacha-creator">
         <h3>1. Upload Creature Image (Auto-Transparent)</h3>
@@ -138,13 +139,25 @@
       <div id="gacha-grid" class="cards-grid"></div>
     </section>
 
-    <!-- SCREEN 5: POINT MONITOR / HISTORY LOG -->
+    <!-- SCREEN 5: E-CLASS RECORD (TASK MATRIX) -->
     <section id="tab-history" class="tab-panel hidden">
       <div class="game-bar" style="justify-content: space-between;">
-        <span class="bar-label">📜 RECENT POINT AWARDS</span>
-        <select id="history-class-filter" class="class-selector"></select>
+        <div class="inline-group" style="align-items: center;">
+          <span class="bar-label">📊 E-CLASS RECORD:</span>
+          <select id="history-class-filter" class="class-selector"></select>
+        </div>
+        <div class="legend-pills">
+          <span class="pill-done">✅ Completed</span>
+          <span class="pill-miss">❌ Did Not Do Task</span>
+        </div>
       </div>
-      <div id="history-list" class="history-stack"></div>
+
+      <div class="record-table-wrap">
+        <table class="e-record-table">
+          <thead id="record-thead"></thead>
+          <tbody id="record-tbody"></tbody>
+        </table>
+      </div>
     </section>
 
   </div>
