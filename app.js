@@ -1,5 +1,7 @@
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzReMeuhTNzHlzNBA6BvldLcGLNTLsOBf6-zunyHc6cdk1u5Mt3hBkfur8XY9ZPK22n/exec';
 
+const ELEM_ICONS = { Fire: '🔥', Nature: '🌿', Water: '💧', Lightning: '⚡' };
+
 let state = { teacher: null, classes: [], students: [], gachaPool: [], taskRecords: [] };
 let uploadedImageData = null;
 
@@ -219,7 +221,6 @@ window.scoreStudentTask = (studentId, awardedPoints) => {
   const student = state.students.find(s => s.id === studentId);
   if (!student || !classId) return;
 
-  // Find existing record for this task to adjust student's spendable balance accurately
   const existing = state.taskRecords.find(
     r => r.classId === classId && r.studentId === studentId && r.taskName.toLowerCase() === taskName.toLowerCase()
   );
@@ -238,7 +239,6 @@ window.scoreStudentTask = (studentId, awardedPoints) => {
   renderStudents();
   renderEClassRecord();
 
-  // Save silently in background
   callGAS('recordTask', { classId, studentId, taskName, points: awardedPoints });
 };
 
@@ -271,7 +271,7 @@ window.awardAllStudents = () => {
   callGAS('bulkRecordTask', { classId, taskName, points: customPts });
 };
 
-// --- 4. GACHA POOL (AUTO-TRANSPARENT + MISCRITS IDLE) ---
+// --- 4. GACHA POOL (NAME + ELEMENT + AUTO-TRANSPARENT) ---
 function removeOuterWhiteBackground(ctx, width, height) {
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
@@ -363,16 +363,23 @@ window.uploadAndAddGacha = async (rarity) => {
     return alert('Click UPLOAD IMAGE first!');
   }
 
+  const nameInput = document.getElementById('gacha-name-input');
+  const name = nameInput.value.trim() || `${rarity} Critter`;
+  const element = document.getElementById('gacha-element-select').value;
+
   toggleLoader(true);
   const res = await callGAS('addGacha', {
     teacherId: state.teacher.id,
+    name,
     rarity,
+    element,
     imageData: uploadedImageData
   });
 
   if (res.success) {
     state.gachaPool.push(res.data);
     uploadedImageData = null;
+    nameInput.value = '';
     document.getElementById('gacha-file').value = '';
     document.getElementById('gacha-preview').classList.add('hidden');
     document.getElementById('file-status').textContent = 'No file chosen';
@@ -382,16 +389,21 @@ window.uploadAndAddGacha = async (rarity) => {
 };
 
 function renderGacha() {
-  document.getElementById('gacha-grid').innerHTML = state.gachaPool.map((item, idx) => `
-    <div class="item-card">
-      <img src="${item.imageUrl}" class="gacha-img" style="animation-delay: -${(idx * 0.4) % 2}s;" alt="Creature">
-      <div>
-        <span class="badge ${item.rarity}">${item.rarity}</span>
-        <p class="item-meta" style="margin-top:6px;">${item.dropRate}% CHANCE</p>
+  document.getElementById('gacha-grid').innerHTML = state.gachaPool.map((item, idx) => {
+    const elem = item.element || 'Nature';
+    const displayName = item.name || `${item.rarity} Critter`;
+    return `
+      <div class="item-card">
+        <img src="${item.imageUrl}" class="gacha-img" style="animation-delay: -${(idx * 0.4) % 2}s;" alt="${displayName}">
+        <div>
+          <h4 style="margin-bottom:6px;">${displayName}</h4>
+          <span class="badge ${item.rarity}">${item.rarity}</span>
+          <p class="item-meta" style="margin-top:6px;">${ELEM_ICONS[elem] || '✨'} ${elem} • ${item.dropRate}% CHANCE</p>
+        </div>
+        <button class="game-btn btn-red btn-sm" onclick="removeGacha('${item.id}')">DELETE</button>
       </div>
-      <button class="game-btn btn-red btn-sm" onclick="removeGacha('${item.id}')">DELETE</button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 window.removeGacha = async (itemId) => {
@@ -421,7 +433,6 @@ function renderEClassRecord() {
     return;
   }
 
-  // Extract unique task names in chronological order
   const taskColumns = [];
   classRecords.forEach(r => {
     if (!taskColumns.some(t => t.toLowerCase() === r.taskName.toLowerCase())) {
@@ -429,7 +440,6 @@ function renderEClassRecord() {
     }
   });
 
-  // Render Header Row
   thead.innerHTML = `
     <tr>
       <th>Student Name</th>
@@ -439,7 +449,6 @@ function renderEClassRecord() {
     </tr>
   `;
 
-  // Render Student Rows
   tbody.innerHTML = classStudents.map(student => {
     let totalTaskScore = 0;
 
