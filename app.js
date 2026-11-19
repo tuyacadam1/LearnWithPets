@@ -1,37 +1,9 @@
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzReMeuhTNzHlzNBA6BvldLcGLNTLsOBf6-zunyHc6cdk1u5Mt3hBkfur8XY9ZPK22n/exec';
 
-// Built-in game loot icons so you can click-and-add immediately
-const PRESET_LOOT = [
-  'https://cdn-icons-png.flaticon.com/512/2583/2583344.png', // Gold Medal
-  'https://cdn-icons-png.flaticon.com/512/1828/1828884.png', // Star
-  'https://cdn-icons-png.flaticon.com/512/616/616490.png',   // Gem
-  'https://cdn-icons-png.flaticon.com/512/2583/2583319.png', // Trophy
-  'https://cdn-icons-png.flaticon.com/512/3176/3176366.png', // Crown
-  'https://cdn-icons-png.flaticon.com/512/869/869869.png',   // Potion
-  'https://cdn-icons-png.flaticon.com/512/1067/1067357.png', // Treasure Chest
-  'https://cdn-icons-png.flaticon.com/512/3209/3209993.png'  // Gift Box
-];
-
 let state = { teacher: null, classes: [], students: [], gachaPool: [] };
+let uploadedImageData = null;
 
 const toggleLoader = (show) => document.getElementById('loader').classList.toggle('hidden', !show);
-
-// Initialize preset icon buttons
-const iconPicker = document.getElementById('preset-icons');
-const urlInput = document.getElementById('gacha-img-url');
-urlInput.value = PRESET_LOOT[0];
-
-PRESET_LOOT.forEach((url, idx) => {
-  const img = document.createElement('img');
-  img.src = url;
-  img.className = 'icon-option' + (idx === 0 ? ' selected' : '');
-  img.onclick = () => {
-    document.querySelectorAll('.icon-option').forEach(el => el.classList.remove('selected'));
-    img.classList.add('selected');
-    urlInput.value = url;
-  };
-  iconPicker.appendChild(img);
-});
 
 async function callGAS(action, payload = {}) {
   try {
@@ -229,19 +201,65 @@ window.changePoints = async (studentId, delta) => {
   toggleLoader(false);
 };
 
-// --- 4. GACHA POOL (1-CLICK RARITY BUTTONS) ---
-window.quickAddGacha = async (rarity) => {
-  const imageUrl = document.getElementById('gacha-img-url').value.trim();
-  if (!imageUrl) return alert('Pick an icon or paste an image link first!');
+// --- 4. GACHA POOL (IMAGE UPLOAD + RARITY BUTTONS) ---
+document.getElementById('gacha-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      // Resize to max 200x200 so it saves cleanly in Google Sheets without Drive permissions
+      const canvas = document.createElement('canvas');
+      const maxSize = 200;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height && width > maxSize) {
+        height *= maxSize / width;
+        width = maxSize;
+      } else if (height > maxSize) {
+        width *= maxSize / height;
+        height = maxSize;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      uploadedImageData = canvas.toDataURL('image/webp', 0.85);
+
+      const preview = document.getElementById('gacha-preview');
+      preview.src = uploadedImageData;
+      preview.classList.remove('hidden');
+      document.getElementById('file-status').textContent = file.name;
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+window.uploadAndAddGacha = async (rarity) => {
+  if (!uploadedImageData) {
+    return alert('Click UPLOAD IMAGE first!');
+  }
 
   toggleLoader(true);
   const res = await callGAS('addGacha', {
     teacherId: state.teacher.id,
     rarity,
-    imageUrl
+    imageData: uploadedImageData
   });
+
   if (res.success) {
     state.gachaPool.push(res.data);
+    // Reset upload state
+    uploadedImageData = null;
+    document.getElementById('gacha-file').value = '';
+    document.getElementById('gacha-preview').classList.add('hidden');
+    document.getElementById('file-status').textContent = 'No file chosen';
     renderGacha();
   }
   toggleLoader(false);
