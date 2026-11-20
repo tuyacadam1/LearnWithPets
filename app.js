@@ -117,7 +117,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 function renderAll() {
   renderClassDropdowns();
   renderClassesAndStudents();
-  renderTaskPointsList();
+  renderAwardCheckboxList();
   renderHistoryMatrix();
   renderGachaPool();
 }
@@ -225,8 +225,14 @@ window.deleteStudent = async (studentId) => {
   toggleLoader(false);
 };
 
-// ================= TAB 2: TASK POINTS =================
-function renderTaskPointsList() {
+// ================= TAB 2: AWARD ACTIVITY POINTS (CHECKBOXES) =================
+function updateSelectedCounter() {
+  const checked = document.querySelectorAll('.stu-checkbox:checked').length;
+  const tag = document.getElementById('selected-count-tag');
+  if (tag) tag.textContent = `(${checked} selected)`;
+}
+
+function renderAwardCheckboxList(precheckStudentId = null) {
   const classId = state.activeClassId;
   const students = state.students.filter(s => s.classId === classId);
   const records = state.taskRecords.filter(r => r.classId === classId);
@@ -242,138 +248,95 @@ function renderTaskPointsList() {
     datalist.innerHTML = taskNames.map(t => `<option value="${t}">`).join('');
   }
 
-  const indList = document.getElementById('individual-task-list');
-  if (!indList) return;
+  const box = document.getElementById('student-checkbox-box');
+  if (!box) return;
 
   if (!students.length) {
-    indList.innerHTML = '<p class="helper-text">No students in this class yet.</p>';
+    box.innerHTML = '<p class="helper-text" style="margin:4px;">No students in this class yet.</p>';
+    updateSelectedCounter();
     return;
   }
 
-  const currentTaskName = (document.getElementById('bulk-task-name')?.value || '').trim().toLowerCase();
+  const currentAct = (document.getElementById('activity-name-input')?.value || '').trim().toLowerCase();
 
-  indList.innerHTML = students.map(s => {
-    const existingRec = currentTaskName
-      ? records.find(r => r.studentId === s.id && r.taskName.toLowerCase() === currentTaskName)
+  box.innerHTML = students.map(s => {
+    const existing = currentAct
+      ? records.find(r => r.studentId === s.id && r.taskName.toLowerCase() === currentAct)
       : null;
-    const prefillVal = existingRec ? existingRec.points : '';
+    const isChecked = precheckStudentId ? (s.id === precheckStudentId) : false;
 
     return `
-      <div class="entity-row">
-        <div class="entity-left">
-          <strong>${s.name}</strong>
-          <span class="pts-pill">${s.points} ⭐</span>
-        </div>
-        <div class="entity-right">
-          <input type="number" class="student-score-input" data-student-id="${s.id}" id="score-input-${s.id}" value="${prefillVal}" placeholder="Pts" min="0" style="width: 110px;">
-          <button type="button" class="btn btn-green btn-sm" onclick="saveSingleStudentScore('${s.id}')">SAVE</button>
-        </div>
-      </div>
+      <label class="stu-check-row">
+        <span class="stu-check-left">
+          <input type="checkbox" class="stu-checkbox" value="${s.id}" ${isChecked ? 'checked' : ''} onchange="updateSelectedCounter()">
+          <span>${s.name} (${s.points} pts)</span>
+        </span>
+        ${existing ? `<span class="stu-existing-tag">Recorded: ${existing.points}</span>` : ''}
+      </label>
     `;
   }).join('');
+
+  updateSelectedCounter();
 }
 
-// Auto-load existing scores when typing or picking a task name
-document.getElementById('bulk-task-name')?.addEventListener('input', () => {
-  const currentTaskName = (document.getElementById('bulk-task-name')?.value || '').trim().toLowerCase();
+document.getElementById('activity-name-input')?.addEventListener('input', () => {
+  const currentAct = (document.getElementById('activity-name-input')?.value || '').trim().toLowerCase();
   const records = state.taskRecords.filter(r => r.classId === state.activeClassId);
+  const matchedRec = currentAct ? records.find(r => r.taskName.toLowerCase() === currentAct) : null;
 
-  document.querySelectorAll('.student-score-input').forEach(input => {
-    const stuId = input.dataset.studentId;
-    const rec = currentTaskName
-      ? records.find(r => r.studentId === stuId && r.taskName.toLowerCase() === currentTaskName)
-      : null;
-    input.value = rec ? rec.points : '';
+  if (matchedRec && matchedRec.classification) {
+    const classifEl = document.getElementById('activity-classif-select');
+    if (classifEl) classifEl.value = matchedRec.classification;
+  }
+
+  const checkedIds = new Set(
+    Array.from(document.querySelectorAll('.stu-checkbox:checked')).map(cb => cb.value)
+  );
+  renderAwardCheckboxList();
+  document.querySelectorAll('.stu-checkbox').forEach(cb => {
+    if (checkedIds.has(cb.value)) cb.checked = true;
   });
+  updateSelectedCounter();
 });
 
-// Save ALL filled student scores at once (1 fast batch call!)
-document.getElementById('save-all-scores-btn')?.addEventListener('click', async () => {
+document.getElementById('select-all-students-btn')?.addEventListener('click', () => {
+  document.querySelectorAll('.stu-checkbox').forEach(cb => { cb.checked = true; });
+  updateSelectedCounter();
+});
+
+document.getElementById('clear-students-btn')?.addEventListener('click', () => {
+  document.querySelectorAll('.stu-checkbox').forEach(cb => { cb.checked = false; });
+  updateSelectedCounter();
+});
+
+document.getElementById('award-activity-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
   if (!state.activeClassId) return alert('Select a class first!');
-  const taskInput = document.getElementById('bulk-task-name');
-  const taskName = taskInput ? taskInput.value.trim() : '';
-  if (!taskName) {
-    taskInput?.focus();
-    return alert('Please enter a Task Name (e.g. Quiz #1) first!');
-  }
 
-  const entries = [];
-  document.querySelectorAll('.student-score-input').forEach(input => {
-    if (input.value.trim() !== '') {
-      entries.push({
-        studentId: input.dataset.studentId,
-        points: Number(input.value) || 0
-      });
-    }
-  });
+  const taskName = document.getElementById('activity-name-input')?.value.trim();
+  const classification = document.getElementById('activity-classif-select')?.value || 'Written Works';
+  const points = Number(document.getElementById('activity-points-input')?.value);
 
-  if (entries.length === 0) {
-    return alert('Enter at least one student score below (or click "AWARD SAME TO ALL").');
-  }
+  const selectedIds = Array.from(document.querySelectorAll('.stu-checkbox:checked')).map(cb => cb.value);
+
+  if (!taskName) return alert('Please enter or select an Activity Name.');
+  if (isNaN(points) || points < 0) return alert('Please enter valid Points to Award.');
+  if (selectedIds.length === 0) return alert('Please check at least one student (or click "Select All").');
+
+  const entries = selectedIds.map(studentId => ({ studentId, points }));
 
   toggleLoader(true);
   const res = await callGAS('batchRecordTasks', {
     classId: state.activeClassId,
     taskName,
+    classification,
     entries
   });
   if (res.success) {
     await syncData();
+    switchTab('history');
   } else {
-    alert(res.message || 'Failed to save scores.');
-  }
-  toggleLoader(false);
-});
-
-window.saveSingleStudentScore = async (studentId) => {
-  const taskInput = document.getElementById('bulk-task-name');
-  const taskName = taskInput ? taskInput.value.trim() : '';
-  if (!taskName) {
-    taskInput?.focus();
-    return alert('Please enter a Task Name (e.g. Quiz #1) at the top first!');
-  }
-  const valStr = document.getElementById(`score-input-${studentId}`)?.value.trim();
-  if (valStr === '') {
-    return alert('Enter a score first!');
-  }
-  const points = Number(valStr) || 0;
-
-  toggleLoader(true);
-  const res = await callGAS('recordTask', {
-    classId: state.activeClassId,
-    studentId,
-    taskName,
-    points
-  });
-  if (res.success) {
-    await syncData();
-  } else {
-    alert(res.message || 'Failed to save score.');
-  }
-  toggleLoader(false);
-};
-
-document.getElementById('award-whole-class-btn')?.addEventListener('click', async () => {
-  if (!state.activeClassId) return alert('Select a class first!');
-  const taskInput = document.getElementById('bulk-task-name');
-  const taskName = taskInput ? taskInput.value.trim() : '';
-  const points = Number(document.getElementById('bulk-task-points')?.value) || 0;
-
-  if (!taskName) {
-    taskInput?.focus();
-    return alert('Please enter a Task Name (e.g. Quiz #1) first!');
-  }
-
-  toggleLoader(true);
-  const res = await callGAS('bulkRecordTask', {
-    classId: state.activeClassId,
-    taskName,
-    points
-  });
-  if (res.success) {
-    await syncData();
-  } else {
-    alert(res.message || 'Failed to award class points.');
+    alert(res.message || 'Failed to award points.');
   }
   toggleLoader(false);
 });
@@ -420,14 +383,14 @@ function renderHistoryMatrix() {
       const safeTask = tName.replace(/'/g, "\\'");
       if (!rec) {
         missingCount++;
-        return `<td class="cell-missing" title="Click to enter score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', '')">MISSING</td>`;
+        return `<td class="cell-missing" title="Click to award points" onclick="jumpToAwardStudent('${stu.id}', '${safeTask}', '')">MISSING</td>`;
       }
       totalEarned += rec.points;
       if (rec.points === 0) {
         missingCount++;
-        return `<td class="cell-zero" title="Click to edit score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', 0)">0</td>`;
+        return `<td class="cell-zero" title="Click to edit points" onclick="jumpToAwardStudent('${stu.id}', '${safeTask}', 0)">0</td>`;
       }
-      return `<td class="cell-scored" title="Click to edit score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', ${rec.points})">${rec.points}</td>`;
+      return `<td class="cell-scored" title="Click to edit points" onclick="jumpToAwardStudent('${stu.id}', '${safeTask}', ${rec.points})">${rec.points}</td>`;
     }).join('');
 
     const statusHtml = taskNames.length === 0
@@ -448,19 +411,13 @@ function renderHistoryMatrix() {
   }).join('');
 }
 
-window.jumpToEditScore = (studentId, taskName, suggestedPts) => {
+window.jumpToAwardStudent = (studentId, taskName, existingPts) => {
   switchTab('tasks');
-  const taskInput = document.getElementById('bulk-task-name');
-  if (taskInput) {
-    taskInput.value = taskName;
-    taskInput.dispatchEvent(new Event('input'));
-  }
-  const rowInput = document.getElementById(`score-input-${studentId}`);
-  if (rowInput) {
-    if (suggestedPts !== '') rowInput.value = suggestedPts;
-    rowInput.focus();
-    rowInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
+  const actInput = document.getElementById('activity-name-input');
+  const ptsInput = document.getElementById('activity-points-input');
+  if (actInput) actInput.value = taskName;
+  if (ptsInput && existingPts !== '') ptsInput.value = existingPts;
+  renderAwardCheckboxList(studentId);
 };
 
 // ================= TAB 4: GACHA POOL =================
