@@ -9,7 +9,10 @@ let state = {
   activeClassId: ''
 };
 
-const toggleLoader = (show) => document.getElementById('loader').classList.toggle('hidden', !show);
+const toggleLoader = (show) => {
+  const el = document.getElementById('loader');
+  if (el) el.classList.toggle('hidden', !show);
+};
 
 async function callGAS(action, payload = {}) {
   try {
@@ -24,33 +27,57 @@ async function callGAS(action, payload = {}) {
   }
 }
 
+function compressImage(file, maxSize = 360) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // --- LOGIN / LOGOUT / REFRESH ---
-document.getElementById('teacher-login-form').addEventListener('submit', async (e) => {
+document.getElementById('teacher-login-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const username = document.getElementById('username-input').value.trim();
-  const password = document.getElementById('password-input').value.trim();
+  const userEl = document.getElementById('username-input') || e.target.querySelector('input[type="text"]');
+  const passEl = document.getElementById('password-input') || e.target.querySelector('input[type="password"]');
+  const username = userEl ? userEl.value.trim() : '';
+  const password = passEl ? passEl.value.trim() : '';
 
   toggleLoader(true);
   const res = await callGAS('login', { username, password });
   if (res.success) {
     state.teacher = res.teacher;
-    document.getElementById('teacher-greeting').textContent = `Welcome, ${res.teacher.name}!`;
-    document.getElementById('login-view').classList.add('hidden');
-    document.getElementById('dashboard-view').classList.remove('hidden');
+    const greetEl = document.getElementById('teacher-greeting');
+    if (greetEl) greetEl.textContent = `Welcome, ${res.teacher.name}!`;
+    document.getElementById('login-view')?.classList.add('hidden');
+    document.getElementById('dashboard-view')?.classList.remove('hidden');
     await syncData();
   } else {
-    document.getElementById('login-error').textContent = res.message;
+    const errEl = document.getElementById('login-error');
+    if (errEl) errEl.textContent = res.message || 'Login failed!';
   }
   toggleLoader(false);
 });
 
-document.getElementById('logout-btn').addEventListener('click', () => {
+document.getElementById('logout-btn')?.addEventListener('click', () => {
   state.teacher = null;
-  document.getElementById('dashboard-view').classList.add('hidden');
-  document.getElementById('login-view').classList.remove('hidden');
+  document.getElementById('dashboard-view')?.classList.add('hidden');
+  document.getElementById('login-view')?.classList.remove('hidden');
 });
 
-document.getElementById('refresh-teacher-btn').addEventListener('click', async () => {
+document.getElementById('refresh-teacher-btn')?.addEventListener('click', async () => {
   toggleLoader(true);
   await syncData();
   toggleLoader(false);
@@ -96,21 +123,18 @@ function renderAll() {
 }
 
 function renderClassDropdowns() {
-  const sFilter = document.getElementById('students-class-filter');
-  const tFilter = document.getElementById('tasks-class-filter');
-  const hFilter = document.getElementById('history-class-filter');
-
   const opts = state.classes.length
     ? state.classes.map(c => `<option value="${c.id}" ${c.id === state.activeClassId ? 'selected' : ''}>${c.name}</option>`).join('')
     : '<option value="">No Classes</option>';
 
-  sFilter.innerHTML = opts;
-  tFilter.innerHTML = opts;
-  hFilter.innerHTML = opts;
+  ['students-class-filter', 'tasks-class-filter', 'history-class-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
 }
 
 ['students-class-filter', 'tasks-class-filter', 'history-class-filter'].forEach(id => {
-  document.getElementById(id).addEventListener('change', (e) => {
+  document.getElementById(id)?.addEventListener('change', (e) => {
     state.activeClassId = e.target.value;
     renderAll();
   });
@@ -119,15 +143,18 @@ function renderClassDropdowns() {
 // ================= TAB 1: CLASSES & STUDENTS =================
 function renderClassesAndStudents() {
   const chipsWrap = document.getElementById('class-chips-list');
-  chipsWrap.innerHTML = state.classes.map(c => `
-    <div class="class-chip">
-      <span>${c.name}</span>
-      <button type="button" class="chip-del" title="Delete Class" onclick="deleteClass('${c.id}')">✕</button>
-    </div>
-  `).join('');
+  if (chipsWrap) {
+    chipsWrap.innerHTML = state.classes.map(c => `
+      <div class="class-chip">
+        <span>${c.name}</span>
+        <button type="button" class="chip-del" title="Delete Class" onclick="deleteClass('${c.id}')">✕</button>
+      </div>
+    `).join('');
+  }
 
   const classStudents = state.students.filter(s => s.classId === state.activeClassId);
   const stuList = document.getElementById('students-list');
+  if (!stuList) return;
 
   if (!classStudents.length) {
     stuList.innerHTML = '<p class="helper-text">No students in this class yet.</p>';
@@ -148,14 +175,15 @@ function renderClassesAndStudents() {
   `).join('');
 }
 
-document.getElementById('add-class-form').addEventListener('submit', async (e) => {
+document.getElementById('add-class-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const className = document.getElementById('new-class-name').value.trim();
+  const input = document.getElementById('new-class-name');
+  const className = input ? input.value.trim() : '';
   if (!className) return;
   toggleLoader(true);
   const res = await callGAS('addClass', { teacherId: state.teacher.id, className });
   if (res.success) {
-    document.getElementById('new-class-name').value = '';
+    if (input) input.value = '';
     state.activeClassId = res.data.id;
     await syncData();
   }
@@ -170,18 +198,20 @@ window.deleteClass = async (classId) => {
   toggleLoader(false);
 };
 
-document.getElementById('add-student-form').addEventListener('submit', async (e) => {
+document.getElementById('add-student-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!state.activeClassId) return alert('Create a class first!');
-  const name = document.getElementById('new-student-name').value.trim();
-  const points = Number(document.getElementById('new-student-points').value) || 0;
+  const nameEl = document.getElementById('new-student-name');
+  const ptsEl = document.getElementById('new-student-points');
+  const name = nameEl ? nameEl.value.trim() : '';
+  const points = ptsEl ? (Number(ptsEl.value) || 0) : 0;
   if (!name) return;
 
   toggleLoader(true);
   const res = await callGAS('addStudent', { classId: state.activeClassId, name, points });
   if (res.success) {
-    document.getElementById('new-student-name').value = '';
-    document.getElementById('new-student-points').value = '0';
+    if (nameEl) nameEl.value = '';
+    if (ptsEl) ptsEl.value = '0';
     await syncData();
   }
   toggleLoader(false);
@@ -207,10 +237,14 @@ function renderTaskPointsList() {
       taskNames.push(r.taskName);
     }
   });
-  document.getElementById('task-names-datalist').innerHTML =
-    taskNames.map(t => `<option value="${t}">`).join('');
+  const datalist = document.getElementById('task-names-datalist');
+  if (datalist) {
+    datalist.innerHTML = taskNames.map(t => `<option value="${t}">`).join('');
+  }
 
   const indList = document.getElementById('individual-task-list');
+  if (!indList) return;
+
   if (!students.length) {
     indList.innerHTML = '<p class="helper-text">No students in this class yet.</p>';
     return;
@@ -231,12 +265,13 @@ function renderTaskPointsList() {
 }
 
 window.saveSingleStudentScore = async (studentId) => {
-  const taskName = document.getElementById('bulk-task-name').value.trim();
+  const taskInput = document.getElementById('bulk-task-name');
+  const taskName = taskInput ? taskInput.value.trim() : '';
   if (!taskName) {
-    document.getElementById('bulk-task-name').focus();
+    taskInput?.focus();
     return alert('Please enter a Task Name (e.g. Quiz #1) at the top first!');
   }
-  const points = Number(document.getElementById(`score-input-${studentId}`).value) || 0;
+  const points = Number(document.getElementById(`score-input-${studentId}`)?.value) || 0;
 
   toggleLoader(true);
   const res = await callGAS('recordTask', {
@@ -251,13 +286,14 @@ window.saveSingleStudentScore = async (studentId) => {
   toggleLoader(false);
 };
 
-document.getElementById('award-whole-class-btn').addEventListener('click', async () => {
+document.getElementById('award-whole-class-btn')?.addEventListener('click', async () => {
   if (!state.activeClassId) return alert('Select a class first!');
-  const taskName = document.getElementById('bulk-task-name').value.trim();
-  const points = Number(document.getElementById('bulk-task-points').value) || 0;
+  const taskInput = document.getElementById('bulk-task-name');
+  const taskName = taskInput ? taskInput.value.trim() : '';
+  const points = Number(document.getElementById('bulk-task-points')?.value) || 0;
 
   if (!taskName) {
-    document.getElementById('bulk-task-name').focus();
+    taskInput?.focus();
     return alert('Please enter a Task Name (e.g. Quiz #1) first!');
   }
 
@@ -275,6 +311,10 @@ document.getElementById('award-whole-class-btn').addEventListener('click', async
 
 // ================= TAB 3: HISTORY (E-CLASS RECORD MATRIX) =================
 function renderHistoryMatrix() {
+  const thead = document.getElementById('eclass-thead');
+  const tbody = document.getElementById('eclass-tbody');
+  if (!thead || !tbody) return;
+
   const classId = state.activeClassId;
   const students = state.students.filter(s => s.classId === classId);
   const records = state.taskRecords.filter(r => r.classId === classId);
@@ -285,9 +325,6 @@ function renderHistoryMatrix() {
       taskNames.push(r.taskName);
     }
   });
-
-  const thead = document.getElementById('eclass-thead');
-  const tbody = document.getElementById('eclass-tbody');
 
   if (!students.length) {
     thead.innerHTML = '';
@@ -344,7 +381,8 @@ function renderHistoryMatrix() {
 
 window.jumpToEditScore = (studentId, taskName, suggestedPts) => {
   switchTab('tasks');
-  document.getElementById('bulk-task-name').value = taskName;
+  const taskInput = document.getElementById('bulk-task-name');
+  if (taskInput) taskInput.value = taskName;
   const rowInput = document.getElementById(`score-input-${studentId}`);
   if (rowInput) {
     rowInput.value = suggestedPts;
@@ -355,8 +393,11 @@ window.jumpToEditScore = (studentId, taskName, suggestedPts) => {
 
 // ================= TAB 4: GACHA POOL =================
 function renderGachaPool() {
-  document.getElementById('pool-count').textContent = state.gachaPool.length;
+  const countEl = document.getElementById('pool-count');
+  if (countEl) countEl.textContent = state.gachaPool.length;
   const grid = document.getElementById('gacha-pool-grid');
+  if (!grid) return;
+
   grid.innerHTML = state.gachaPool.map(item => `
     <div class="gacha-card">
       <img src="${item.imageUrl}" alt="${item.name}">
@@ -368,33 +409,30 @@ function renderGachaPool() {
   `).join('');
 }
 
-document.getElementById('add-gacha-form').addEventListener('submit', async (e) => {
+document.getElementById('add-gacha-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = document.getElementById('gacha-name-input').value.trim();
-  const rarity = document.getElementById('gacha-rarity-select').value;
-  const element = document.getElementById('gacha-element-select').value;
+  const nameEl = document.getElementById('gacha-name-input');
+  const rarityEl = document.getElementById('gacha-rarity-select');
+  const elemEl = document.getElementById('gacha-element-select');
   const fileInput = document.getElementById('gacha-image-input');
-  const file = fileInput.files[0];
+  const file = fileInput?.files?.[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = async () => {
-    toggleLoader(true);
-    const res = await callGAS('addGacha', {
-      teacherId: state.teacher.id,
-      name,
-      rarity,
-      element,
-      imageData: reader.result
-    });
-    if (res.success) {
-      document.getElementById('gacha-name-input').value = '';
-      fileInput.value = '';
-      await syncData();
-    }
-    toggleLoader(false);
-  };
-  reader.readAsDataURL(file);
+  toggleLoader(true);
+  const imageData = await compressImage(file, 360);
+  const res = await callGAS('addGacha', {
+    teacherId: state.teacher.id,
+    name: nameEl ? nameEl.value.trim() : '',
+    rarity: rarityEl ? rarityEl.value : 'Common',
+    element: elemEl ? elemEl.value : 'Nature',
+    imageData
+  });
+  if (res.success) {
+    if (nameEl) nameEl.value = '';
+    if (fileInput) fileInput.value = '';
+    await syncData();
+  }
+  toggleLoader(false);
 });
 
 window.deleteGachaItem = async (itemId) => {
