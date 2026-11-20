@@ -3,171 +3,127 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EduGacha Game Master</title>
+  <link rel="icon" href="data:,">
+  <title>EduGacha Teacher Portal</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Loading Spinner -->
+  <!-- Loading Overlay -->
   <div id="loader" class="loader-overlay hidden">
     <div class="spinner"></div>
   </div>
 
-  <!-- LOGIN SCREEN -->
+  <!-- TEACHER LOGIN SCREEN -->
   <div id="login-view" class="auth-container">
-    <div class="game-box auth-card">
-      <h1>🎮 GAME MASTER</h1>
-      <p>Enter your Teacher Credentials</p>
-      <form id="login-form">
-        <input type="text" id="login-username" required placeholder="Username (e.g. admin)">
+    <div class="card auth-card">
+      <h1>🎓 TEACHER PORTAL</h1>
+      <p>Sign in to manage classes, points & Gacha rewards</p>
+      <form id="teacher-login-form">
+        <input type="text" id="login-username" required placeholder="Username">
         <input type="password" id="login-password" required placeholder="Password">
         <p id="login-error" class="error-msg"></p>
-        <button type="submit" class="game-btn btn-green full-width">▶ START GAME</button>
+        <button type="submit" class="btn btn-primary full-width">LOGIN</button>
       </form>
     </div>
   </div>
 
-  <!-- GAME LOBBY DASHBOARD -->
-  <div id="dashboard-view" class="game-container hidden">
-    
-    <!-- Top HUD Bar -->
-    <header class="hud-bar">
-      <div class="hud-title">🎓 <span>EDUGACHA</span></div>
-      <div class="hud-user">
-        <span id="teacher-display-name">Player 1</span>
-        <button id="logout-btn" class="game-btn btn-red btn-sm">EXIT</button>
+  <!-- TEACHER DASHBOARD -->
+  <div id="dashboard-view" class="container hidden">
+
+    <!-- Top Header Bar -->
+    <header class="top-bar">
+      <div>
+        <h2 id="teacher-welcome">Welcome, Teacher!</h2>
+        <span class="sub-text">EduGacha Classroom Control Panel</span>
+      </div>
+      <div class="header-actions">
+        <button id="refresh-teacher-btn" class="btn btn-blue">🔄 REFRESH</button>
+        <button id="logout-btn" class="btn btn-danger">LOGOUT</button>
       </div>
     </header>
 
-    <!-- 5 BIG GAME MENU BUTTONS -->
-    <nav class="menu-grid">
-      <button class="menu-btn btn-blue active" data-tab="classes">
-        <span class="icon">🏰</span>
-        <span class="label">CLASSES</span>
-      </button>
-      <button class="menu-btn btn-purple" data-tab="students">
-        <span class="icon">👾</span>
-        <span class="label">STUDENTS</span>
-      </button>
-      <button class="menu-btn btn-gold" data-tab="points">
-        <span class="icon">⭐</span>
-        <span class="label">POINTS</span>
-      </button>
-      <button class="menu-btn btn-pink" data-tab="gacha">
-        <span class="icon">🎰</span>
-        <span class="label">GACHA POOL</span>
-      </button>
-      <button class="menu-btn btn-teal" data-tab="history">
-        <span class="icon">📊</span>
-        <span class="label">E-CLASS RECORD</span>
-      </button>
+    <!-- Navigation Tabs -->
+    <nav class="tabs-bar">
+      <button class="tab-btn active" data-tab="classes">🏫 Classes & Students</button>
+      <button class="tab-btn" data-tab="tasks">⭐ Task Points</button>
+      <button class="tab-btn" data-tab="gacha">🎰 Gacha Pool</button>
     </nav>
 
-    <!-- SCREEN 1: CLASSES -->
-    <section id="tab-classes" class="tab-panel active">
-      <form id="add-class-form" class="game-bar">
-        <input type="text" id="new-class-name" placeholder="New Guild / Class Name..." required>
-        <button type="submit" class="game-btn btn-green">+ CREATE</button>
-      </form>
-      <div id="classes-grid" class="cards-grid"></div>
-    </section>
-
-    <!-- SCREEN 2: STUDENTS -->
-    <section id="tab-students" class="tab-panel hidden">
-      <div class="game-bar">
-        <select id="student-class-filter" class="class-selector"></select>
-        <form id="add-student-form" class="inline-group">
-          <input type="text" id="new-student-name" placeholder="Player Name..." required>
-          <input type="number" id="new-student-points" placeholder="Pts" value="0" min="0" style="width:80px;">
-          <button type="submit" class="game-btn btn-green">+ RECRUIT</button>
+    <!-- TAB 1: CLASSES & STUDENTS -->
+    <section id="tab-classes" class="tab-panel">
+      <div class="card">
+        <h3>Create New Class</h3>
+        <form id="add-class-form" class="inline-form">
+          <input type="text" id="new-class-name" required placeholder="e.g. Grade 7 - Einstein">
+          <button type="submit" class="btn btn-success">+ ADD CLASS</button>
         </form>
       </div>
-      <div id="students-grid" class="cards-grid"></div>
-    </section>
 
-    <!-- SCREEN 3: CUSTOM TASK & POINTS -->
-    <section id="tab-points" class="tab-panel hidden">
-      <div class="game-box">
-        <div class="task-setup-grid">
-          <div class="field-group">
-            <label class="bar-label">GUILD / CLASS:</label>
-            <select id="points-class-filter" class="class-selector"></select>
-          </div>
-          <div class="field-group">
-            <label class="bar-label">TASK NAME:</label>
-            <input type="text" id="task-name-input" value="Attendance" placeholder="e.g. Attendance, Quiz 1, Lab 2">
-          </div>
-          <div class="field-group">
-            <label class="bar-label">CUSTOM POINTS:</label>
-            <input type="number" id="task-points-input" value="50" min="0" step="5">
-          </div>
-          <div class="field-group" style="justify-content: flex-end;">
-            <button type="button" id="bulk-award-btn" class="game-btn btn-gold" onclick="awardAllStudents()">
-              🔥 AWARD ALL (+50)
-            </button>
-          </div>
+      <div class="card">
+        <div class="section-header">
+          <h3>Manage Students</h3>
+          <select id="class-selector"></select>
         </div>
+
+        <form id="add-student-form" class="inline-form" style="margin-bottom: 14px;">
+          <input type="text" id="new-student-name" required placeholder="Student Full Name">
+          <input type="number" id="new-student-points" value="0" min="0" placeholder="Starting ⭐" style="max-width: 130px;">
+          <button type="submit" class="btn btn-primary">+ ADD STUDENT</button>
+        </form>
+
+        <div id="students-list" class="list-stack"></div>
       </div>
-
-      <div id="points-grid" class="cards-grid"></div>
     </section>
 
-    <!-- SCREEN 4: GACHA POOL (NAME + ELEMENT + AUTO-TRANSPARENT) -->
-    <section id="tab-gacha" class="tab-panel hidden">
-      <div class="game-box gacha-creator">
-        <h3>1. Upload Creature Image (Auto-Transparent)</h3>
-        <div class="upload-row">
-          <label for="gacha-file" class="game-btn btn-blue upload-btn">
-            📁 UPLOAD IMAGE
-          </label>
-          <input type="file" id="gacha-file" accept="image/*" class="hidden">
-          <img id="gacha-preview" class="preview-box hidden" alt="Preview">
-          <span id="file-status" class="item-meta">No file chosen</span>
+    <!-- TAB 2: RECORD TASK POINTS -->
+    <section id="tab-tasks" class="tab-panel hidden">
+      <div class="card">
+        <div class="section-header">
+          <h3>Award Task / Quiz Points</h3>
+          <select id="task-class-selector"></select>
         </div>
 
-        <h3 style="margin-top:18px;">2. Name & Element</h3>
-        <div class="inline-group" style="max-width: 540px;">
-          <input type="text" id="gacha-name-input" placeholder="Creature Name (e.g. Acornhog)..." style="flex: 2; min-width: 180px;">
-          <select id="gacha-element-select" style="flex: 1; min-width: 140px;">
+        <form id="bulk-task-form" class="inline-form" style="margin-bottom: 16px;">
+          <input type="text" id="task-name-input" required placeholder="Task Name (e.g. Quiz #1)">
+          <input type="number" id="task-points-input" required value="10" min="0" placeholder="Points" style="max-width: 120px;">
+          <button type="submit" class="btn btn-gold">⭐ AWARD TO WHOLE CLASS</button>
+        </form>
+
+        <p class="hint-text">Or record/update individual student scores below:</p>
+        <div id="task-students-list" class="list-stack"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: GACHA POOL MANAGER -->
+    <section id="tab-gacha" class="tab-panel hidden">
+      <div class="card">
+        <h3>Add New Gacha Creature</h3>
+        <form id="add-gacha-form" class="gacha-form">
+          <input type="text" id="gacha-name" required placeholder="Creature Name (e.g. Ignis Pup)">
+          <select id="gacha-rarity">
+            <option value="Common">Common (45%)</option>
+            <option value="Uncommon">Uncommon (28%)</option>
+            <option value="Rare">Rare (15%)</option>
+            <option value="Epic">Epic (8%)</option>
+            <option value="Mythic">Mythic (2.5%)</option>
+            <option value="Legend">Legend (1%)</option>
+            <option value="Secret">🌟 Secret (0.5%)</option>
+          </select>
+          <select id="gacha-element">
             <option value="Fire">🔥 Fire</option>
-            <option value="Nature" selected>🌿 Nature</option>
+            <option value="Nature">🌿 Nature</option>
             <option value="Water">💧 Water</option>
             <option value="Lightning">⚡ Lightning</option>
           </select>
-        </div>
-
-        <h3 style="margin-top:18px;">3. Click Rarity to Add!</h3>
-        <div class="rarity-btn-grid">
-          <button type="button" class="game-btn rarity-btn Common" onclick="uploadAndAddGacha('Common')">COMMON<br><small>45%</small></button>
-          <button type="button" class="game-btn rarity-btn Uncommon" onclick="uploadAndAddGacha('Uncommon')">UNCOMMON<br><small>28%</small></button>
-          <button type="button" class="game-btn rarity-btn Rare" onclick="uploadAndAddGacha('Rare')">RARE<br><small>15%</small></button>
-          <button type="button" class="game-btn rarity-btn Epic" onclick="uploadAndAddGacha('Epic')">EPIC<br><small>8%</small></button>
-          <button type="button" class="game-btn rarity-btn Mythic" onclick="uploadAndAddGacha('Mythic')">MYTHIC<br><small>3%</small></button>
-          <button type="button" class="game-btn rarity-btn Legend" onclick="uploadAndAddGacha('Legend')">LEGEND<br><small>1%</small></button>
-        </div>
+          <input type="file" id="gacha-image-file" accept="image/*" required>
+          <button type="submit" class="btn btn-success">+ UPLOAD TO POOL</button>
+        </form>
       </div>
 
-      <div id="gacha-grid" class="cards-grid"></div>
-    </section>
-
-    <!-- SCREEN 5: E-CLASS RECORD (TASK MATRIX) -->
-    <section id="tab-history" class="tab-panel hidden">
-      <div class="game-bar" style="justify-content: space-between;">
-        <div class="inline-group" style="align-items: center;">
-          <span class="bar-label">📊 E-CLASS RECORD:</span>
-          <select id="history-class-filter" class="class-selector"></select>
-        </div>
-        <div class="legend-pills">
-          <span class="pill-done">✅ Completed</span>
-          <span class="pill-miss">❌ Did Not Do Task</span>
-        </div>
-      </div>
-
-      <div class="record-table-wrap">
-        <table class="e-record-table">
-          <thead id="record-thead"></thead>
-          <tbody id="record-tbody"></tbody>
-        </table>
+      <div class="card">
+        <h3>Current Gacha Pool (<span id="pool-count">0</span>)</h3>
+        <div id="gacha-pool-grid" class="gacha-grid"></div>
       </div>
     </section>
 
