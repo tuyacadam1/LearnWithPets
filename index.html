@@ -83,11 +83,12 @@
         <div class="row-form">
           <input type="text" id="bulk-task-name" placeholder="Task Name (e.g. Quiz #1)" list="task-names-datalist">
           <datalist id="task-names-datalist"></datalist>
-          <input type="number" id="bulk-task-points" value="10" min="0" style="max-width: 160px;">
-          <button type="button" id="award-whole-class-btn" class="btn btn-gold">⭐ AWARD TO WHOLE CLASS</button>
+          <input type="number" id="bulk-task-points" value="10" min="0" style="max-width: 140px;">
+          <button type="button" id="award-whole-class-btn" class="btn btn-gold">⭐ AWARD SAME TO ALL</button>
+          <button type="button" id="save-all-scores-btn" class="btn btn-green">💾 SAVE ALL SCORES</button>
         </div>
 
-        <p class="helper-text">Or record/update individual student scores below:</p>
+        <p class="helper-text">Type/select a Task Name, adjust scores below (blank = skip student), then click <strong>💾 SAVE ALL SCORES</strong> once:</p>
         <div id="individual-task-list" class="stack-list"></div>
       </div>
     </section>
