@@ -39,7 +39,7 @@
       </div>
     </header>
 
-    <!-- 4 CLEAN NAVIGATION TABS -->
+    <!-- 4 NAVIGATION TABS -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="classes">🏫 Classes & Students</button>
       <button class="tab-btn" data-tab="tasks">⭐ Task Points</button>
@@ -72,24 +72,50 @@
       </div>
     </section>
 
-    <!-- TAB 2: TASK POINTS -->
+    <!-- TAB 2: AWARD ACTIVITY POINTS (CHECKBOX WORKFLOW) -->
     <section id="tab-tasks" class="tab-panel hidden">
-      <div class="panel">
+      <div class="panel award-panel">
         <div class="panel-header">
-          <h3>Award Task / Quiz Points</h3>
+          <h3 class="award-heading">⚡ AWARD ACTIVITY POINTS</h3>
           <select id="tasks-class-filter" class="select-box"></select>
         </div>
 
-        <div class="row-form">
-          <input type="text" id="bulk-task-name" placeholder="Task Name (e.g. Quiz #1)" list="task-names-datalist">
-          <datalist id="task-names-datalist"></datalist>
-          <input type="number" id="bulk-task-points" value="10" min="0" style="max-width: 140px;">
-          <button type="button" id="award-whole-class-btn" class="btn btn-gold">⭐ AWARD SAME TO ALL</button>
-          <button type="button" id="save-all-scores-btn" class="btn btn-green">💾 SAVE ALL SCORES</button>
-        </div>
+        <form id="award-activity-form" class="award-form-stack">
+          <div class="field-group">
+            <label for="activity-name-input">Activity Name:</label>
+            <input type="text" id="activity-name-input" placeholder="Select or type activity..." list="task-names-datalist" required>
+            <datalist id="task-names-datalist"></datalist>
+          </div>
 
-        <p class="helper-text">Type/select a Task Name, adjust scores below (blank = skip student), then click <strong>💾 SAVE ALL SCORES</strong> once:</p>
-        <div id="individual-task-list" class="stack-list"></div>
+          <div class="field-group">
+            <label for="activity-classif-select">Activity Classification:</label>
+            <select id="activity-classif-select" class="select-box full-width">
+              <option value="Written Works">Written Works</option>
+              <option value="Performance Tasks">Performance Tasks</option>
+              <option value="Quarterly Assessment">Quarterly Assessment</option>
+              <option value="Attendance / Participation">Attendance / Participation</option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label for="activity-points-input">Points to Award:</label>
+            <input type="number" id="activity-points-input" placeholder="Points (e.g. 50)" min="0" required>
+          </div>
+
+          <div class="field-group">
+            <div class="select-students-header">
+              <label>Select Students: <span id="selected-count-tag" class="count-tag">(0 selected)</span></label>
+              <div class="select-actions">
+                <button type="button" id="select-all-students-btn" class="btn btn-slate btn-sm">Select All</button>
+                <button type="button" id="clear-students-btn" class="btn btn-slate btn-sm">Clear</button>
+              </div>
+            </div>
+
+            <div id="student-checkbox-box" class="checkbox-list-box"></div>
+          </div>
+
+          <button type="submit" class="btn btn-teal full-width award-submit-btn">🏅 Award Points</button>
+        </form>
       </div>
     </section>
 
@@ -107,7 +133,7 @@
             <select id="history-class-filter" class="select-box"></select>
           </div>
         </div>
-        <p class="helper-text">Click any cell below to jump to Task Points and enter or update that student's score.</p>
+        <p class="helper-text">Click any cell below to jump to Task Points with that activity & student pre-selected.</p>
 
         <div class="table-scroll">
           <table class="eclass-table">
