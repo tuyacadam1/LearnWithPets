@@ -13,210 +13,230 @@ const toggleLoader = (show) => document.getElementById('loader').classList.toggl
 
 async function callGAS(action, payload = {}) {
   try {
-    const response = await fetch(GAS_WEB_APP_URL, {
+    const res = await fetch(GAS_WEB_APP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, payload })
     });
-    return await response.json();
+    return await res.json();
   } catch (err) {
-    return { success: false, message: 'Network error connecting to server.' };
+    return { success: false, message: err.toString() };
   }
 }
 
 // --- LOGIN / LOGOUT / REFRESH ---
 document.getElementById('teacher-login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const username = document.getElementById('login-username').value.trim();
-  const password = document.getElementById('login-password').value.trim();
+  const username = document.getElementById('username-input').value.trim();
+  const password = document.getElementById('password-input').value.trim();
 
   toggleLoader(true);
   const res = await callGAS('login', { username, password });
   if (res.success) {
     state.teacher = res.teacher;
-    document.getElementById('login-error').textContent = '';
-    document.getElementById('teacher-welcome').textContent = `Welcome, ${state.teacher.name}!`;
+    document.getElementById('teacher-greeting').textContent = `Welcome, ${res.teacher.name}!`;
     document.getElementById('login-view').classList.add('hidden');
     document.getElementById('dashboard-view').classList.remove('hidden');
-    await syncTeacherData();
+    await syncData();
   } else {
-    document.getElementById('login-error').textContent = res.message || 'Login failed!';
+    document.getElementById('login-error').textContent = res.message;
   }
   toggleLoader(false);
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => {
   state.teacher = null;
-  state.classes = [];
-  state.students = [];
-  state.gachaPool = [];
-  state.taskRecords = [];
   document.getElementById('dashboard-view').classList.add('hidden');
   document.getElementById('login-view').classList.remove('hidden');
 });
 
-async function syncTeacherData() {
+document.getElementById('refresh-teacher-btn').addEventListener('click', async () => {
+  toggleLoader(true);
+  await syncData();
+  toggleLoader(false);
+});
+
+async function syncData() {
   if (!state.teacher) return;
   const res = await callGAS('getData', { teacherId: state.teacher.id });
-  if (res && res.success) {
-    state.classes = res.classes || [];
-    state.students = res.students || [];
-    state.gachaPool = res.gachaPool || [];
-    state.taskRecords = res.taskRecords || [];
+  if (!res.success) return;
 
-    if (!state.classes.some(c => c.id === state.activeClassId)) {
-      state.activeClassId = state.classes[0] ? state.classes[0].id : '';
-    }
+  state.classes = res.classes || [];
+  state.students = res.students || [];
+  state.gachaPool = res.gachaPool || [];
+  state.taskRecords = res.taskRecords || [];
 
-    renderClassSelectors();
-    renderStudents();
-    renderTaskStudents();
-    renderGachaPool();
+  if (!state.activeClassId || !state.classes.some(c => c.id === state.activeClassId)) {
+    state.activeClassId = state.classes.length > 0 ? state.classes[0].id : '';
   }
+
+  renderAll();
 }
 
-document.getElementById('refresh-teacher-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('refresh-teacher-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ SYNCING...';
-  toggleLoader(true);
-  await syncTeacherData();
-  toggleLoader(false);
-  btn.disabled = false;
-  btn.textContent = '🔄 REFRESH';
-});
+// --- NAVIGATION TABS ---
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabName);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('hidden', p.id !== `tab-${tabName}`);
+  });
+}
 
-// --- TABS ---
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-    btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
-  });
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
-// --- CLASSES ---
-document.getElementById('add-class-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const className = document.getElementById('new-class-name').value.trim();
-  if (!className) return;
-
-  toggleLoader(true);
-  const res = await callGAS('addClass', { teacherId: state.teacher.id, className });
-  if (res.success) {
-    state.classes.push(res.data);
-    state.activeClassId = res.data.id;
-    document.getElementById('new-class-name').value = '';
-    renderClassSelectors();
-    renderStudents();
-    renderTaskStudents();
-  }
-  toggleLoader(false);
-});
-
-function renderClassSelectors() {
-  const selectors = [
-    document.getElementById('class-selector'),
-    document.getElementById('task-class-selector')
-  ];
-
-  const optionsHtml = state.classes.length
-    ? state.classes.map(c => `<option value="${c.id}" ${c.id === state.activeClassId ? 'selected' : ''}>${c.name}</option>`).join('')
-    : '<option value="">No Classes Yet</option>';
-
-  selectors.forEach(sel => {
-    if (!sel) return;
-    sel.innerHTML = optionsHtml;
-    sel.onchange = (e) => {
-      state.activeClassId = e.target.value;
-      renderClassSelectors();
-      renderStudents();
-      renderTaskStudents();
-    };
-  });
+function renderAll() {
+  renderClassDropdowns();
+  renderClassesAndStudents();
+  renderTaskPointsList();
+  renderHistoryMatrix();
+  renderGachaPool();
 }
 
-// --- STUDENTS ---
-document.getElementById('add-student-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (!state.activeClassId) return alert('Create or select a class first!');
+function renderClassDropdowns() {
+  const sFilter = document.getElementById('students-class-filter');
+  const tFilter = document.getElementById('tasks-class-filter');
+  const hFilter = document.getElementById('history-class-filter');
 
-  const name = document.getElementById('new-student-name').value.trim();
-  const points = Number(document.getElementById('new-student-points').value) || 0;
+  const opts = state.classes.length
+    ? state.classes.map(c => `<option value="${c.id}" ${c.id === state.activeClassId ? 'selected' : ''}>${c.name}</option>`).join('')
+    : '<option value="">No Classes</option>';
 
-  toggleLoader(true);
-  const res = await callGAS('addStudent', { classId: state.activeClassId, name, points });
-  if (res.success) {
-    state.students.push(res.data);
-    document.getElementById('new-student-name').value = '';
-    document.getElementById('new-student-points').value = '0';
-    renderStudents();
-    renderTaskStudents();
-  }
-  toggleLoader(false);
+  sFilter.innerHTML = opts;
+  tFilter.innerHTML = opts;
+  hFilter.innerHTML = opts;
+}
+
+['students-class-filter', 'tasks-class-filter', 'history-class-filter'].forEach(id => {
+  document.getElementById(id).addEventListener('change', (e) => {
+    state.activeClassId = e.target.value;
+    renderAll();
+  });
 });
 
-window.removeStudent = async (studentId) => {
-  if (!confirm('Delete this student?')) return;
-  toggleLoader(true);
-  const res = await callGAS('deleteStudent', { studentId });
-  if (res.success) {
-    state.students = state.students.filter(s => s.id !== studentId);
-    renderStudents();
-    renderTaskStudents();
-  }
-  toggleLoader(false);
-};
+// ================= TAB 1: CLASSES & STUDENTS =================
+function renderClassesAndStudents() {
+  const chipsWrap = document.getElementById('class-chips-list');
+  chipsWrap.innerHTML = state.classes.map(c => `
+    <div class="class-chip">
+      <span>${c.name}</span>
+      <button type="button" class="chip-del" title="Delete Class" onclick="deleteClass('${c.id}')">✕</button>
+    </div>
+  `).join('');
 
-function renderStudents() {
-  const list = document.getElementById('students-list');
-  const filtered = state.students.filter(s => s.classId === state.activeClassId);
+  const classStudents = state.students.filter(s => s.classId === state.activeClassId);
+  const stuList = document.getElementById('students-list');
 
-  if (!filtered.length) {
-    list.innerHTML = '<p class="hint-text">No students in this class yet.</p>';
+  if (!classStudents.length) {
+    stuList.innerHTML = '<p class="helper-text">No students in this class yet.</p>';
     return;
   }
 
-  list.innerHTML = filtered.map(s => `
-    <div class="list-row">
-      <div>
+  stuList.innerHTML = classStudents.map(s => `
+    <div class="entity-row">
+      <div class="entity-left">
         <strong>${s.name}</strong>
         <span class="id-pill">${s.id}</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="pts-badge">${s.points} ⭐</span>
-        <button class="btn btn-danger btn-sm" onclick="removeStudent('${s.id}')">DELETE</button>
+      <div class="entity-right">
+        <span class="pts-pill">${s.points} ⭐</span>
+        <button type="button" class="btn btn-red btn-sm" onclick="deleteStudent('${s.id}')">DELETE</button>
       </div>
     </div>
   `).join('');
 }
 
-// --- TASK POINTS ---
-document.getElementById('bulk-task-form').addEventListener('submit', async (e) => {
+document.getElementById('add-class-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!state.activeClassId) return alert('Select a class first!');
-
-  const taskName = document.getElementById('task-name-input').value.trim();
-  const points = Number(document.getElementById('task-points-input').value) || 0;
-
+  const className = document.getElementById('new-class-name').value.trim();
+  if (!className) return;
   toggleLoader(true);
-  const res = await callGAS('bulkRecordTask', {
-    classId: state.activeClassId,
-    taskName,
-    points
-  });
+  const res = await callGAS('addClass', { teacherId: state.teacher.id, className });
   if (res.success) {
-    await syncTeacherData();
-    alert(`Awarded "${taskName}" (${points} ⭐) to the class!`);
+    document.getElementById('new-class-name').value = '';
+    state.activeClassId = res.data.id;
+    await syncData();
   }
   toggleLoader(false);
 });
 
-window.awardSingleStudent = async (studentId) => {
-  const taskName = document.getElementById('task-name-input').value.trim() || 'Bonus Task';
-  const inputEl = document.getElementById(`pts-input-${studentId}`);
-  const points = Number(inputEl.value) || 0;
+window.deleteClass = async (classId) => {
+  if (!confirm('Delete this class?')) return;
+  toggleLoader(true);
+  await callGAS('deleteClass', { classId });
+  await syncData();
+  toggleLoader(false);
+};
+
+document.getElementById('add-student-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!state.activeClassId) return alert('Create a class first!');
+  const name = document.getElementById('new-student-name').value.trim();
+  const points = Number(document.getElementById('new-student-points').value) || 0;
+  if (!name) return;
+
+  toggleLoader(true);
+  const res = await callGAS('addStudent', { classId: state.activeClassId, name, points });
+  if (res.success) {
+    document.getElementById('new-student-name').value = '';
+    document.getElementById('new-student-points').value = '0';
+    await syncData();
+  }
+  toggleLoader(false);
+});
+
+window.deleteStudent = async (studentId) => {
+  if (!confirm('Delete this student?')) return;
+  toggleLoader(true);
+  await callGAS('deleteStudent', { studentId });
+  await syncData();
+  toggleLoader(false);
+};
+
+// ================= TAB 2: TASK POINTS =================
+function renderTaskPointsList() {
+  const classId = state.activeClassId;
+  const students = state.students.filter(s => s.classId === classId);
+  const records = state.taskRecords.filter(r => r.classId === classId);
+
+  const taskNames = [];
+  records.forEach(r => {
+    if (!taskNames.some(t => t.toLowerCase() === r.taskName.toLowerCase())) {
+      taskNames.push(r.taskName);
+    }
+  });
+  document.getElementById('task-names-datalist').innerHTML =
+    taskNames.map(t => `<option value="${t}">`).join('');
+
+  const indList = document.getElementById('individual-task-list');
+  if (!students.length) {
+    indList.innerHTML = '<p class="helper-text">No students in this class yet.</p>';
+    return;
+  }
+
+  indList.innerHTML = students.map(s => `
+    <div class="entity-row">
+      <div class="entity-left">
+        <strong>${s.name}</strong>
+        <span class="pts-pill">${s.points} ⭐</span>
+      </div>
+      <div class="entity-right">
+        <input type="number" id="score-input-${s.id}" value="10" min="0" style="width: 110px;">
+        <button type="button" class="btn btn-green btn-sm" onclick="saveSingleStudentScore('${s.id}')">SAVE SCORE</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.saveSingleStudentScore = async (studentId) => {
+  const taskName = document.getElementById('bulk-task-name').value.trim();
+  if (!taskName) {
+    document.getElementById('bulk-task-name').focus();
+    return alert('Please enter a Task Name (e.g. Quiz #1) at the top first!');
+  }
+  const points = Number(document.getElementById(`score-input-${studentId}`).value) || 0;
 
   toggleLoader(true);
   const res = await callGAS('recordTask', {
@@ -226,111 +246,161 @@ window.awardSingleStudent = async (studentId) => {
     points
   });
   if (res.success) {
-    const stu = state.students.find(s => s.id === studentId);
-    if (stu) stu.points = res.newBalance;
-    renderStudents();
-    renderTaskStudents();
+    await syncData();
   }
   toggleLoader(false);
 };
 
-function renderTaskStudents() {
-  const list = document.getElementById('task-students-list');
-  const filtered = state.students.filter(s => s.classId === state.activeClassId);
+document.getElementById('award-whole-class-btn').addEventListener('click', async () => {
+  if (!state.activeClassId) return alert('Select a class first!');
+  const taskName = document.getElementById('bulk-task-name').value.trim();
+  const points = Number(document.getElementById('bulk-task-points').value) || 0;
 
-  if (!filtered.length) {
-    list.innerHTML = '<p class="hint-text">No students in this class yet.</p>';
-    return;
+  if (!taskName) {
+    document.getElementById('bulk-task-name').focus();
+    return alert('Please enter a Task Name (e.g. Quiz #1) first!');
   }
 
-  list.innerHTML = filtered.map(s => `
-    <div class="list-row">
-      <div>
-        <strong>${s.name}</strong>
-        <span class="pts-badge" style="margin-left:8px;">${s.points} ⭐</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <input type="number" id="pts-input-${s.id}" value="10" min="0" style="width:90px;padding:6px 10px;">
-        <button class="btn btn-success btn-sm" onclick="awardSingleStudent('${s.id}')">SAVE SCORE</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-// --- GACHA POOL ---
-function compressImage(file, maxSize = 180) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-document.getElementById('add-gacha-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = document.getElementById('gacha-name').value.trim();
-  const rarity = document.getElementById('gacha-rarity').value;
-  const element = document.getElementById('gacha-element').value;
-  const file = document.getElementById('gacha-image-file').files[0];
-  if (!file) return;
-
   toggleLoader(true);
-  const imageData = await compressImage(file, 180);
-  const res = await callGAS('addGacha', {
-    teacherId: state.teacher.id,
-    name,
-    rarity,
-    element,
-    imageData
+  const res = await callGAS('bulkRecordTask', {
+    classId: state.activeClassId,
+    taskName,
+    points
   });
-
   if (res.success) {
-    state.gachaPool.push(res.data);
-    document.getElementById('add-gacha-form').reset();
-    renderGachaPool();
+    await syncData();
   }
   toggleLoader(false);
 });
 
-window.removeGachaItem = async (itemId) => {
-  if (!confirm('Remove this creature from the Gacha Pool?')) return;
-  toggleLoader(true);
-  const res = await callGAS('deleteGacha', { itemId });
-  if (res.success) {
-    state.gachaPool = state.gachaPool.filter(g => g.id !== itemId);
-    renderGachaPool();
-  }
-  toggleLoader(false);
-};
+// ================= TAB 3: HISTORY (E-CLASS RECORD MATRIX) =================
+function renderHistoryMatrix() {
+  const classId = state.activeClassId;
+  const students = state.students.filter(s => s.classId === classId);
+  const records = state.taskRecords.filter(r => r.classId === classId);
 
-function renderGachaPool() {
-  document.getElementById('pool-count').textContent = state.gachaPool.length;
-  const grid = document.getElementById('gacha-pool-grid');
+  const taskNames = [];
+  records.forEach(r => {
+    if (!taskNames.some(t => t.toLowerCase() === r.taskName.toLowerCase())) {
+      taskNames.push(r.taskName);
+    }
+  });
 
-  if (!state.gachaPool.length) {
-    grid.innerHTML = '<p class="hint-text">No creatures in pool yet.</p>';
+  const thead = document.getElementById('eclass-thead');
+  const tbody = document.getElementById('eclass-tbody');
+
+  if (!students.length) {
+    thead.innerHTML = '';
+    tbody.innerHTML = '<tr><td style="padding:18px;color:#94a3b8;">No students enrolled in this class yet.</td></tr>';
     return;
   }
 
+  thead.innerHTML = `
+    <tr>
+      <th style="text-align:left;">Student</th>
+      ${taskNames.map(t => `<th>${t}</th>`).join('')}
+      <th>Missing</th>
+      <th>Task Total</th>
+      <th>Wallet ⭐</th>
+    </tr>
+  `;
+
+  tbody.innerHTML = students.map(stu => {
+    let missingCount = 0;
+    let totalEarned = 0;
+
+    const taskCells = taskNames.map(tName => {
+      const rec = records.find(r => r.studentId === stu.id && r.taskName.toLowerCase() === tName.toLowerCase());
+      const safeTask = tName.replace(/'/g, "\\'");
+      if (!rec) {
+        missingCount++;
+        return `<td class="cell-missing" title="Click to enter score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', 10)">MISSING</td>`;
+      }
+      totalEarned += rec.points;
+      if (rec.points === 0) {
+        missingCount++;
+        return `<td class="cell-zero" title="Click to edit score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', 0)">0</td>`;
+      }
+      return `<td class="cell-scored" title="Click to edit score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', ${rec.points})">${rec.points}</td>`;
+    }).join('');
+
+    const statusHtml = taskNames.length === 0
+      ? '—'
+      : (missingCount > 0
+          ? `<span class="badge-missing">${missingCount} Missing</span>`
+          : `<span class="badge-clear">All Clear</span>`);
+
+    return `
+      <tr>
+        <td class="stu-cell">${stu.name}</td>
+        ${taskCells}
+        <td>${statusHtml}</td>
+        <td><strong>${totalEarned}</strong></td>
+        <td style="color:#fbbf24;font-weight:800;">${stu.points} ⭐</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.jumpToEditScore = (studentId, taskName, suggestedPts) => {
+  switchTab('tasks');
+  document.getElementById('bulk-task-name').value = taskName;
+  const rowInput = document.getElementById(`score-input-${studentId}`);
+  if (rowInput) {
+    rowInput.value = suggestedPts;
+    rowInput.focus();
+    rowInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+};
+
+// ================= TAB 4: GACHA POOL =================
+function renderGachaPool() {
+  document.getElementById('pool-count').textContent = state.gachaPool.length;
+  const grid = document.getElementById('gacha-pool-grid');
   grid.innerHTML = state.gachaPool.map(item => `
     <div class="gacha-card">
       <img src="${item.imageUrl}" alt="${item.name}">
       <strong>${item.name}</strong>
-      <span class="badge ${item.rarity}">${item.rarity} (${item.dropRate}%)</span>
-      <span class="sub-text">${item.element}</span>
-      <button class="btn btn-danger btn-sm full-width" onclick="removeGachaItem('${item.id}')">REMOVE</button>
+      <span class="r-badge ${item.rarity}">${item.rarity} (${item.dropRate}%)</span>
+      <span style="font-size:12px;color:#94a3b8;">${item.element}</span>
+      <button type="button" class="btn btn-red btn-sm full-width" onclick="deleteGachaItem('${item.id}')">REMOVE</button>
     </div>
   `).join('');
 }
+
+document.getElementById('add-gacha-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('gacha-name-input').value.trim();
+  const rarity = document.getElementById('gacha-rarity-select').value;
+  const element = document.getElementById('gacha-element-select').value;
+  const fileInput = document.getElementById('gacha-image-input');
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    toggleLoader(true);
+    const res = await callGAS('addGacha', {
+      teacherId: state.teacher.id,
+      name,
+      rarity,
+      element,
+      imageData: reader.result
+    });
+    if (res.success) {
+      document.getElementById('gacha-name-input').value = '';
+      fileInput.value = '';
+      await syncData();
+    }
+    toggleLoader(false);
+  };
+  reader.readAsDataURL(file);
+});
+
+window.deleteGachaItem = async (itemId) => {
+  if (!confirm('Remove this creature from the Gacha pool?')) return;
+  toggleLoader(true);
+  await callGAS('deleteGacha', { itemId });
+  await syncData();
+  toggleLoader(false);
+};
