@@ -50,8 +50,8 @@ function compressImage(file, maxSize = 360) {
 // --- LOGIN / LOGOUT / REFRESH ---
 document.getElementById('teacher-login-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const userEl = document.getElementById('username-input') || e.target.querySelector('input[type="text"]');
-  const passEl = document.getElementById('password-input') || e.target.querySelector('input[type="password"]');
+  const userEl = document.getElementById('username-input');
+  const passEl = document.getElementById('password-input');
   const username = userEl ? userEl.value.trim() : '';
   const password = passEl ? passEl.value.trim() : '';
 
@@ -250,19 +250,80 @@ function renderTaskPointsList() {
     return;
   }
 
-  indList.innerHTML = students.map(s => `
-    <div class="entity-row">
-      <div class="entity-left">
-        <strong>${s.name}</strong>
-        <span class="pts-pill">${s.points} ⭐</span>
+  const currentTaskName = (document.getElementById('bulk-task-name')?.value || '').trim().toLowerCase();
+
+  indList.innerHTML = students.map(s => {
+    const existingRec = currentTaskName
+      ? records.find(r => r.studentId === s.id && r.taskName.toLowerCase() === currentTaskName)
+      : null;
+    const prefillVal = existingRec ? existingRec.points : '';
+
+    return `
+      <div class="entity-row">
+        <div class="entity-left">
+          <strong>${s.name}</strong>
+          <span class="pts-pill">${s.points} ⭐</span>
+        </div>
+        <div class="entity-right">
+          <input type="number" class="student-score-input" data-student-id="${s.id}" id="score-input-${s.id}" value="${prefillVal}" placeholder="Pts" min="0" style="width: 110px;">
+          <button type="button" class="btn btn-green btn-sm" onclick="saveSingleStudentScore('${s.id}')">SAVE</button>
+        </div>
       </div>
-      <div class="entity-right">
-        <input type="number" id="score-input-${s.id}" value="10" min="0" style="width: 110px;">
-        <button type="button" class="btn btn-green btn-sm" onclick="saveSingleStudentScore('${s.id}')">SAVE SCORE</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
+
+// Auto-load existing scores when typing or picking a task name
+document.getElementById('bulk-task-name')?.addEventListener('input', () => {
+  const currentTaskName = (document.getElementById('bulk-task-name')?.value || '').trim().toLowerCase();
+  const records = state.taskRecords.filter(r => r.classId === state.activeClassId);
+
+  document.querySelectorAll('.student-score-input').forEach(input => {
+    const stuId = input.dataset.studentId;
+    const rec = currentTaskName
+      ? records.find(r => r.studentId === stuId && r.taskName.toLowerCase() === currentTaskName)
+      : null;
+    input.value = rec ? rec.points : '';
+  });
+});
+
+// Save ALL filled student scores at once (1 fast batch call!)
+document.getElementById('save-all-scores-btn')?.addEventListener('click', async () => {
+  if (!state.activeClassId) return alert('Select a class first!');
+  const taskInput = document.getElementById('bulk-task-name');
+  const taskName = taskInput ? taskInput.value.trim() : '';
+  if (!taskName) {
+    taskInput?.focus();
+    return alert('Please enter a Task Name (e.g. Quiz #1) first!');
+  }
+
+  const entries = [];
+  document.querySelectorAll('.student-score-input').forEach(input => {
+    if (input.value.trim() !== '') {
+      entries.push({
+        studentId: input.dataset.studentId,
+        points: Number(input.value) || 0
+      });
+    }
+  });
+
+  if (entries.length === 0) {
+    return alert('Enter at least one student score below (or click "AWARD SAME TO ALL").');
+  }
+
+  toggleLoader(true);
+  const res = await callGAS('batchRecordTasks', {
+    classId: state.activeClassId,
+    taskName,
+    entries
+  });
+  if (res.success) {
+    await syncData();
+  } else {
+    alert(res.message || 'Failed to save scores.');
+  }
+  toggleLoader(false);
+});
 
 window.saveSingleStudentScore = async (studentId) => {
   const taskInput = document.getElementById('bulk-task-name');
@@ -271,7 +332,11 @@ window.saveSingleStudentScore = async (studentId) => {
     taskInput?.focus();
     return alert('Please enter a Task Name (e.g. Quiz #1) at the top first!');
   }
-  const points = Number(document.getElementById(`score-input-${studentId}`)?.value) || 0;
+  const valStr = document.getElementById(`score-input-${studentId}`)?.value.trim();
+  if (valStr === '') {
+    return alert('Enter a score first!');
+  }
+  const points = Number(valStr) || 0;
 
   toggleLoader(true);
   const res = await callGAS('recordTask', {
@@ -282,6 +347,8 @@ window.saveSingleStudentScore = async (studentId) => {
   });
   if (res.success) {
     await syncData();
+  } else {
+    alert(res.message || 'Failed to save score.');
   }
   toggleLoader(false);
 };
@@ -305,6 +372,8 @@ document.getElementById('award-whole-class-btn')?.addEventListener('click', asyn
   });
   if (res.success) {
     await syncData();
+  } else {
+    alert(res.message || 'Failed to award class points.');
   }
   toggleLoader(false);
 });
@@ -351,7 +420,7 @@ function renderHistoryMatrix() {
       const safeTask = tName.replace(/'/g, "\\'");
       if (!rec) {
         missingCount++;
-        return `<td class="cell-missing" title="Click to enter score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', 10)">MISSING</td>`;
+        return `<td class="cell-missing" title="Click to enter score" onclick="jumpToEditScore('${stu.id}', '${safeTask}', '')">MISSING</td>`;
       }
       totalEarned += rec.points;
       if (rec.points === 0) {
@@ -382,10 +451,13 @@ function renderHistoryMatrix() {
 window.jumpToEditScore = (studentId, taskName, suggestedPts) => {
   switchTab('tasks');
   const taskInput = document.getElementById('bulk-task-name');
-  if (taskInput) taskInput.value = taskName;
+  if (taskInput) {
+    taskInput.value = taskName;
+    taskInput.dispatchEvent(new Event('input'));
+  }
   const rowInput = document.getElementById(`score-input-${studentId}`);
   if (rowInput) {
-    rowInput.value = suggestedPts;
+    if (suggestedPts !== '') rowInput.value = suggestedPts;
     rowInput.focus();
     rowInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
